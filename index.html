@@ -1,157 +1,193 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Режим пользователя</title>
+    <title>Пользовательский режим - Просмотр растений</title>
     <style>
         body {
-            margin: 0;
-            padding: 0;
             font-family: Arial, sans-serif;
-            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
         }
-
-        #filter {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            background-color: white;
-            padding: 10px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            z-index: 20;
-        }
-
-        #filter label {
-            margin-right: 10px;
-        }
-
-        #filter select {
-            padding: 5px;
-        }
-
-        #container {
-            margin-top: 100px;
+        .container {
             position: relative;
-            display: inline-block;
+            max-width: 800px;
+            margin: 0 auto;
         }
-
-        #image {
-            display: block;
-            max-width: 100%;
+        #backgroundImage {
+            width: 100%;
             height: auto;
+            position: relative;
         }
-
         .circle {
             position: absolute;
             width: 20px;
             height: 20px;
+            background-color: green;
             border-radius: 50%;
             cursor: pointer;
-            background-color: green; /* Все круги зелёные */
-            z-index: 10;
+            opacity: 1;
+            animation: blink 1s infinite;
         }
-
-        .blink {
-            animation: blink-yellow 1s infinite;
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
         }
-
-        @keyframes blink-yellow {
-            0%, 50% { background-color: green; }
-            25%, 75% { background-color: yellow; }
+        .circle.hidden {
+            opacity: 0.3;
+            animation: none;
+        }
+        .filters {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        select {
+            padding: 5px;
+        }
+        button {
+            padding: 5px 10px;
+        }
+        .nav {
+            margin-bottom: 20px;
         }
     </style>
 </head>
 <body>
-    <!-- Фильтр для выбора круга -->
-    <div id="filter">
-        <label for="circle-select">Выберите круг:</label>
-        <select id="circle-select">
-            <option value="">-- Выберите --</option>
-        </select>
-    </div>
-
-    <!-- Контейнер с картинкой и кругами -->
-    <div id="container">
-        <img id="image" src="my-image.jpg" alt="Картинка">
+    <div class="container">
+        <div class="nav">
+            <button onclick="window.location.href='developer.html'">Перейти в режим разработчика</button>
+        </div>
+        
+        <div class="filters">
+            <label>Класс: <select id="classFilter"><option value="">Все</option></select></label>
+            <label>Семейство: <select id="familyFilter"><option value="">Все</option></select></label>
+            <label>Род: <select id="genusFilter"><option value="">Все</option></select></label>
+            <label>Вид: <select id="speciesFilter"><option value="">Все</option></select></label>
+            <label>Сорт: <select id="varietyFilter"><option value="">Все</option></select></label>
+            <button id="resetFilters">Сбросить фильтры</button>
+        </div>
+        
+        <img id="backgroundImage" src="background.jpg" alt="Фон с растениями">
     </div>
 
     <script>
-        const select = document.getElementById('circle-select');
-        const container = document.getElementById('container');
+        // Загружаем данные из localStorage
+        let tableData = JSON.parse(localStorage.getItem('tableData')) || [];
+        let circles = JSON.parse(localStorage.getItem('circles')) || [];
 
-        function createCircle(id, top = '50%', left = '50%') {
-            const circle = document.createElement('div');
-            circle.id = id;
-            circle.className = 'circle';
-            circle.style.top = top;
-            circle.style.left = left;
-            container.appendChild(circle);
-            return circle;
-        }
+        // Элемент для фона
+        const img = document.getElementById('backgroundImage');
+        img.onload = () => {
+            renderCircles();
+            populateFilters();
+        };
 
-        function saveDefaultCircles() {
-            const circles = document.querySelectorAll('.circle');
-            const circleIds = [];
+        // Функция для рендеринга кругов
+        function renderCircles() {
+            // Удаляем старые круги
+            document.querySelectorAll('.circle').forEach(c => c.remove());
+            
+            // Создаём новые круги на основе данных
             circles.forEach(circle => {
-                const id = circle.id;
-                circleIds.push(id);
-                const top = circle.style.top || '50%';
-                const left = circle.style.left || '50%';
-                localStorage.setItem(id, JSON.stringify({ top, left }));
+                const circleEl = document.createElement('div');
+                circleEl.className = 'circle';
+                circleEl.id = circle.id;
+                circleEl.style.left = `${circle.x}%`;
+                circleEl.style.top = `${circle.y}%`;
+                circleEl.title = circle.id; // Подсказка с ID круга
+                img.appendChild(circleEl);
             });
-            localStorage.setItem('circles', JSON.stringify(circleIds));
         }
 
-        function loadCircles() {
-            const savedCircles = localStorage.getItem('circles');
-            if (savedCircles) {
-                const circleIds = JSON.parse(savedCircles);
-                circleIds.forEach(id => {
-                    const savedPos = localStorage.getItem(id);
-                    let top = '50%', left = '50%';
-                    if (savedPos) {
-                        ({ top, left } = JSON.parse(savedPos));
+        // Функция для заполнения фильтров уникальными значениями
+        function populateFilters() {
+            const filters = {
+                classFilter: new Set(),
+                familyFilter: new Set(),
+                genusFilter: new Set(),
+                speciesFilter: new Set(),
+                varietyFilter: new Set()
+            };
+
+            // Собираем уникальные значения из tableData
+            tableData.forEach(row => {
+                filters.classFilter.add(row[0] || ''); // Класс
+                filters.familyFilter.add(row[1] || ''); // Семейство
+                filters.genusFilter.add(row[2] || ''); // Род
+                filters.speciesFilter.add(row[3] || ''); // Вид
+                filters.varietyFilter.add(row[4] || ''); // Сорт
+            });
+
+            // Заполняем select'ы
+            Object.keys(filters).forEach(key => {
+                const select = document.getElementById(key);
+                filters[key].forEach(value => {
+                    if (value) {
+                        const option = document.createElement('option');
+                        option.value = value;
+                        option.textContent = value;
+                        select.appendChild(option);
                     }
-                    createCircle(id, top, left);
                 });
-            } else {
-                // Дефолтные круги, если ничего не сохранено
-                createCircle('circle1', '10%', '10%');
-                createCircle('circle2', '50%', '50%');
-                createCircle('circle3', '80%', '80%');
-                saveDefaultCircles(); // Сохраняем дефолтные в localStorage
-            }
-            updateSelect();
-        }
-
-        function updateSelect() {
-            select.innerHTML = '<option value="">-- Выберите --</option>';
-            document.querySelectorAll('.circle').forEach(circle => {
-                const option = document.createElement('option');
-                option.value = circle.id;
-                option.textContent = circle.id.replace('circle', 'Круг ');
-                select.appendChild(option);
             });
         }
 
-        function resetBlinks() {
-            document.querySelectorAll('.circle').forEach(circle => circle.classList.remove('blink'));
+        // Функция для фильтрации кругов
+        function filterCircles() {
+            const selectedClass = document.getElementById('classFilter').value;
+            const selectedFamily = document.getElementById('familyFilter').value;
+            const selectedGenus = document.getElementById('genusFilter').value;
+            const selectedSpecies = document.getElementById('speciesFilter').value;
+            const selectedVariety = document.getElementById('varietyFilter').value;
+
+            // Находим соответствующие круги
+            const matchingCircles = new Set();
+            tableData.forEach(row => {
+                const circleId = row[5]; // Колонка "Круг"
+                if (
+                    (!selectedClass || row[0] === selectedClass) &&
+                    (!selectedFamily || row[1] === selectedFamily) &&
+                    (!selectedGenus || row[2] === selectedGenus) &&
+                    (!selectedSpecies || row[3] === selectedSpecies) &&
+                    (!selectedVariety || row[4] === selectedVariety)
+                ) {
+                    matchingCircles.add(circleId);
+                }
+            });
+
+            // Применяем фильтр к кругам
+            document.querySelectorAll('.circle').forEach(circle => {
+                if (matchingCircles.has(circle.id)) {
+                    circle.classList.remove('hidden');
+                } else {
+                    circle.classList.add('hidden');
+                }
+            });
         }
 
-        select.addEventListener('change', (event) => {
-            resetBlinks();
-            const selectedValue = event.target.value;
-            if (selectedValue) {
-                const selectedCircle = document.getElementById(selectedValue);
-                if (selectedCircle) {
-                    selectedCircle.classList.add('blink');
-                }
-            }
+        // Обработчики событий для фильтров
+        document.getElementById('classFilter').addEventListener('change', filterCircles);
+        document.getElementById('familyFilter').addEventListener('change', filterCircles);
+        document.getElementById('genusFilter').addEventListener('change', filterCircles);
+        document.getElementById('speciesFilter').addEventListener('change', filterCircles);
+        document.getElementById('varietyFilter').addEventListener('change', filterCircles);
+
+        // Сброс фильтров
+        document.getElementById('resetFilters').addEventListener('click', () => {
+            document.querySelectorAll('select').forEach(select => select.value = '');
+            filterCircles();
         });
 
-        loadCircles();
+        // Инициализация
+        if (img.complete) {
+            renderCircles();
+            populateFilters();
+        }
     </script>
 </body>
 </html>

@@ -3,16 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Картинка с кругами и фильтром</title>
+    <title>Режим пользователя</title>
     <style>
         body {
             margin: 0;
             padding: 0;
             font-family: Arial, sans-serif;
-            background-color: #f0f0f0; /* Фон страницы */
+            background-color: #f0f0f0;
         }
 
-        /* Фильтр сверху */
         #filter {
             position: fixed;
             top: 0;
@@ -32,36 +31,18 @@
             padding: 5px;
         }
 
-        /* Кнопки для режимов */
-        #mode-buttons {
-            margin-top: 10px;
-        }
-
-        button {
-            padding: 5px 10px;
-            margin-right: 10px;
-            cursor: pointer;
-        }
-
-        /* Кнопка сохранения и добавления (скрыты по умолчанию, показываются в режиме разработчика) */
-        #save-button, #add-circle-button {
-            display: none;
-        }
-
-        /* Контейнер для картинки и кругов */
         #container {
-            margin-top: 100px; /* Отступ под фильтр и кнопки */
+            margin-top: 100px;
             position: relative;
-            display: inline-block; /* Чтобы контейнер обёртывал картинку */
+            display: inline-block;
         }
 
         #image {
-            display: block; /* Убираем отступы по умолчанию */
-            max-width: 100%; /* Картинка не растягивается на весь экран, но адаптируется под ширину */
-            height: auto; /* Сохраняем пропорции */
+            display: block;
+            max-width: 100%;
+            height: auto;
         }
 
-        /* Стили для кругов */
         .circle {
             position: absolute;
             width: 20px;
@@ -71,7 +52,6 @@
             z-index: 10;
         }
 
-        /* Цвета: старые круги оранжевые, новые красные */
         .old-circle {
             background-color: orange;
         }
@@ -80,61 +60,34 @@
             background-color: red;
         }
 
-        /* В режиме разработчика курсор move для всех */
-        .developer .circle {
-            cursor: move;
-        }
-
-        /* Анимация мигания жёлтым */
         .blink {
             animation: blink-yellow 1s infinite;
         }
 
         @keyframes blink-yellow {
-            0%, 50% { background-color: currentColor; } /* Сохраняем текущий цвет фона */
+            0%, 50% { background-color: currentColor; }
             25%, 75% { background-color: yellow; }
         }
     </style>
 </head>
 <body>
-    <!-- Фильтр для выбора круга (виден только в режиме пользователя) -->
+    <!-- Фильтр для выбора круга -->
     <div id="filter">
         <label for="circle-select">Выберите круг:</label>
         <select id="circle-select">
             <option value="">-- Выберите --</option>
         </select>
-
-        <!-- Кнопки для переключения режимов -->
-        <div id="mode-buttons">
-            <button id="user-mode">Режим пользователя</button>
-            <button id="developer-mode">Режим разработчика</button>
-            <button id="save-button">Сохранить позиции</button>
-            <button id="add-circle-button">Добавить круг</button>
-        </div>
     </div>
 
     <!-- Контейнер с картинкой и кругами -->
     <div id="container">
-        <!-- Картинка (замени 'my-image.jpg' на своё изображение) -->
         <img id="image" src="my-image.jpg" alt="Картинка">
     </div>
 
     <script>
-        // Получаем элементы
         const select = document.getElementById('circle-select');
         const container = document.getElementById('container');
-        const image = document.getElementById('image');
-        const userModeBtn = document.getElementById('user-mode');
-        const developerModeBtn = document.getElementById('developer-mode');
-        const saveBtn = document.getElementById('save-button');
-        const addCircleBtn = document.getElementById('add-circle-button');
 
-        let isDeveloperMode = false; // Флаг режима (по умолчанию пользователь)
-        let draggedCircle = null; // Текущий перетаскиваемый круг
-        let offsetX, offsetY; // Смещение мыши от центра круга
-        let circleCounter = 1; // Счётчик для ID новых кругов
-
-        // Функция для создания круга (старый или новый)
         function createCircle(id, top = '50%', left = '50%', isOld = false) {
             const circle = document.createElement('div');
             circle.id = id;
@@ -150,7 +103,6 @@
             return circle;
         }
 
-        // Функция для загрузки кругов из localStorage (все загруженные считаются старыми)
         function loadCircles() {
             const savedCircles = localStorage.getItem('circles');
             if (savedCircles) {
@@ -161,21 +113,17 @@
                     if (savedPos) {
                         ({ top, left } = JSON.parse(savedPos));
                     }
-                    createCircle(id, top, left, true); // Старые
+                    createCircle(id, top, left, true);
                 });
-                circleCounter = circleIds.length + 1; // Обновляем счётчик
             } else {
-                // Дефолтные круги (считаем старыми)
+                // Дефолтные круги, если ничего не сохранено
                 createCircle('circle1', '10%', '10%', true);
                 createCircle('circle2', '50%', '50%', true);
                 createCircle('circle3', '80%', '80%', true);
-                circleCounter = 4;
             }
-            updateSelect(); // Обновляем селект
-            updateModeClasses(); // Обновляем классы режима
+            updateSelect();
         }
 
-        // Функция для обновления опций в select
         function updateSelect() {
             select.innerHTML = '<option value="">-- Выберите --</option>';
             document.querySelectorAll('.circle').forEach(circle => {
@@ -186,122 +134,21 @@
             });
         }
 
-        // Функция для обновления классов режима (добавляет/убирает 'developer' на body для CSS)
-        function updateModeClasses() {
-            if (isDeveloperMode) {
-                document.body.classList.add('developer');
-            } else {
-                document.body.classList.remove('developer');
-            }
-        }
-
-        // Функция для сохранения позиций в localStorage
-        function savePositions() {
-            const circles = document.querySelectorAll('.circle');
-            const circleIds = [];
-            circles.forEach(circle => {
-                const id = circle.id;
-                circleIds.push(id);
-                const rect = circle.getBoundingClientRect();
-                const containerRect = container.getBoundingClientRect();
-                const top = ((rect.top - containerRect.top) / containerRect.height * 100) + '%';
-                const left = ((rect.left - containerRect.left) / containerRect.width * 100) + '%';
-                localStorage.setItem(id, JSON.stringify({ top, left }));
-            });
-            localStorage.setItem('circles', JSON.stringify(circleIds));
-            alert('Позиции сохранены!');
-        }
-
-        // Функция для сброса мигания всех кругов
         function resetBlinks() {
             document.querySelectorAll('.circle').forEach(circle => circle.classList.remove('blink'));
         }
 
-        // Обработчик изменения выбора в фильтре (только в режиме пользователя)
         select.addEventListener('change', (event) => {
-            if (!isDeveloperMode) {
-                resetBlinks();
-                const selectedValue = event.target.value;
-                if (selectedValue) {
-                    const selectedCircle = document.getElementById(selectedValue);
-                    if (selectedCircle) {
-                        selectedCircle.classList.add('blink');
-                    }
+            resetBlinks();
+            const selectedValue = event.target.value;
+            if (selectedValue) {
+                const selectedCircle = document.getElementById(selectedValue);
+                if (selectedCircle) {
+                    selectedCircle.classList.add('blink');
                 }
             }
         });
 
-        // Переключение в режим пользователя
-        userModeBtn.addEventListener('click', () => {
-            isDeveloperMode = false;
-            select.style.display = 'inline';
-            saveBtn.style.display = 'none';
-            addCircleBtn.style.display = 'none';
-            updateModeClasses(); // Обновляем классы режима
-            resetBlinks(); // Сбрасываем мигания при переключении
-        });
-
-        // Переключение в режим разработчика
-        developerModeBtn.addEventListener('click', () => {
-            isDeveloperMode = true;
-            select.style.display = 'none';
-            saveBtn.style.display = 'inline';
-            addCircleBtn.style.display = 'inline';
-            updateModeClasses(); // Обновляем классы режима
-            document.querySelectorAll('.circle').forEach(circle => {
-                circle.classList.remove('blink'); // Убираем мигания в режиме разработчика
-            });
-        });
-
-        // Сохранение позиций
-        saveBtn.addEventListener('click', savePositions);
-
-        // Добавление нового круга (смещение относительно последнего)
-        addCircleBtn.addEventListener('click', () => {
-            if (isDeveloperMode) {
-                const circles = document.querySelectorAll('.circle');
-                let lastTop = '50%', lastLeft = '50%';
-                if (circles.length > 0) {
-                    const lastCircle = circles[circles.length - 1];
-                    lastTop = parseFloat(lastCircle.style.top) || 50;
-                    lastLeft = parseFloat(lastCircle.style.left) || 50;
-                }
-                // Смещение: +5% по top и left относительно последнего
-                const newTop = (lastTop + 5) + '%';
-                const newLeft = (lastLeft + 5) + '%';
-                const newId = `circle${circleCounter}`;
-                createCircle(newId, newTop, newLeft, false); // Новый круг - красный
-                circleCounter++;
-                updateSelect(); // Обновляем селект
-            }
-        });
-
-        // Drag-and-drop для кругов в режиме разработчика (всегда в процентах для адаптивности)
-        document.addEventListener('mousedown', (e) => {
-            if (isDeveloperMode && e.target.classList.contains('circle')) {
-                draggedCircle = e.target;
-                const rect = draggedCircle.getBoundingClientRect();
-                const containerRect = container.getBoundingClientRect();
-                offsetX = e.clientX - rect.left - rect.width / 2;
-                offsetY = e.clientY - rect.top - rect.height / 2;
-            }
-        });
-
-        document.addEventListener('mousemove', (e) => {
-            if (draggedCircle && isDeveloperMode) {
-                const containerRect = container.getBoundingClientRect();
-                const newLeftPercent = ((e.clientX - containerRect.left - offsetX - draggedCircle.offsetWidth / 2) / containerRect.width * 100) + '%';
-                const newTopPercent = ((e.clientY - containerRect.top - offsetY - draggedCircle.offsetHeight / 2) / containerRect.height * 100) + '%';
-                draggedCircle.style.left = newLeftPercent;
-                draggedCircle.style.top = newTopPercent;
-            }
-        });
-
-        document.addEventListener('mouseup', () => {
-            draggedCircle = null;
-        });
-
-        // Инициализация: загружаем круги при загрузке страницы
         loadCircles();
     </script>
 </body>

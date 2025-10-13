@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Пользовательский режим - Просмотр растений</title>
+    <title>Пользовательский режим - Просмотр кругов</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -20,40 +20,31 @@
             width: 100%;
             height: auto;
             position: relative;
+            border: 1px solid #ccc;
         }
         .circle {
             position: absolute;
             width: 20px;
             height: 20px;
-            background-color: green;
             border-radius: 50%;
+            background-color: red;
             cursor: pointer;
-            opacity: 1;
-            animation: blink 1s infinite;
+            user-select: none;
+            transition: background-color 0.3s;
+        }
+        .circle:hover {
+            background-color: green;
+            animation: blink 0.5s infinite alternate;
         }
         @keyframes blink {
             0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
+            100% { opacity: 0.5; }
         }
-        .circle.hidden {
-            opacity: 0.3;
-            animation: none;
-        }
-        .filters {
+        .nav, .filters {
             margin-bottom: 20px;
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
         }
         select {
-            padding: 5px;
-        }
-        button {
-            padding: 5px 10px;
-        }
-        .nav {
-            margin-bottom: 20px;
+            margin-right: 10px;
         }
     </style>
 </head>
@@ -69,7 +60,6 @@
             <label>Род: <select id="genusFilter"><option value="">Все</option></select></label>
             <label>Вид: <select id="speciesFilter"><option value="">Все</option></select></label>
             <label>Сорт: <select id="varietyFilter"><option value="">Все</option></select></label>
-            <button id="resetFilters">Сбросить фильтры</button>
         </div>
         
         <img id="backgroundImage" src="my-image.jpg" alt="Фон с растениями">
@@ -77,11 +67,13 @@
 
     <script>
         // Загружаем данные из localStorage
-        let tableData = JSON.parse(localStorage.getItem('tableData')) || [];
         let circles = JSON.parse(localStorage.getItem('circles')) || [];
+        let tableData = JSON.parse(localStorage.getItem('tableData')) || [];
+        let backgroundImageSrc = localStorage.getItem('backgroundImageSrc') || 'my-image.jpg';
 
-        // Элемент для фона
         const img = document.getElementById('backgroundImage');
+        img.src = backgroundImageSrc;
+
         img.onload = () => {
             renderCircles();
             populateFilters();
@@ -92,96 +84,40 @@
             // Удаляем старые круги
             document.querySelectorAll('.circle').forEach(c => c.remove());
             
-            // Создаём новые круги на основе данных
+            // Создаём круги
             circles.forEach(circle => {
                 const circleEl = document.createElement('div');
                 circleEl.className = 'circle';
                 circleEl.id = circle.id;
                 circleEl.style.left = `${circle.x}%`;
                 circleEl.style.top = `${circle.y}%`;
-                circleEl.title = circle.id; // Подсказка с ID круга
+                circleEl.title = `Круг: ${circle.id}`;
                 img.appendChild(circleEl);
             });
         }
 
-        // Функция для заполнения фильтров уникальными значениями
+        // Заполнение фильтров уникальными значениями из tableData
         function populateFilters() {
             const filters = {
-                classFilter: new Set(),
-                familyFilter: new Set(),
-                genusFilter: new Set(),
-                speciesFilter: new Set(),
-                varietyFilter: new Set()
+                classFilter: 0, // Индекс колонки Класс
+                familyFilter: 1, // Семейство
+                genusFilter: 2, // Род
+                speciesFilter: 3, // Вид
+                varietyFilter: 4 // Сорт
             };
 
-            // Собираем уникальные значения из tableData
-            tableData.forEach(row => {
-                filters.classFilter.add(row[0] || ''); // Класс
-                filters.familyFilter.add(row[1] || ''); // Семейство
-                filters.genusFilter.add(row[2] || ''); // Род
-                filters.speciesFilter.add(row[3] || ''); // Вид
-                filters.varietyFilter.add(row[4] || ''); // Сорт
-            });
-
-            // Заполняем select'ы
-            Object.keys(filters).forEach(key => {
-                const select = document.getElementById(key);
-                filters[key].forEach(value => {
-                    if (value) {
-                        const option = document.createElement('option');
-                        option.value = value;
-                        option.textContent = value;
-                        select.appendChild(option);
-                    }
+            Object.keys(filters).forEach(filterId => {
+                const select = document.getElementById(filterId);
+                const columnIndex = filters[filterId];
+                const uniqueValues = [...new Set(tableData.map(row => row[columnIndex]).filter(val => val))];
+                uniqueValues.forEach(value => {
+                    const option = document.createElement('option');
+                    option.value = value;
+                    option.textContent = value;
+                    select.appendChild(option);
                 });
             });
         }
-
-        // Функция для фильтрации кругов
-        function filterCircles() {
-            const selectedClass = document.getElementById('classFilter').value;
-            const selectedFamily = document.getElementById('familyFilter').value;
-            const selectedGenus = document.getElementById('genusFilter').value;
-            const selectedSpecies = document.getElementById('speciesFilter').value;
-            const selectedVariety = document.getElementById('varietyFilter').value;
-
-            // Находим соответствующие круги
-            const matchingCircles = new Set();
-            tableData.forEach(row => {
-                const circleId = row[5]; // Колонка "Круг"
-                if (
-                    (!selectedClass || row[0] === selectedClass) &&
-                    (!selectedFamily || row[1] === selectedFamily) &&
-                    (!selectedGenus || row[2] === selectedGenus) &&
-                    (!selectedSpecies || row[3] === selectedSpecies) &&
-                    (!selectedVariety || row[4] === selectedVariety)
-                ) {
-                    matchingCircles.add(circleId);
-                }
-            });
-
-            // Применяем фильтр к кругам
-            document.querySelectorAll('.circle').forEach(circle => {
-                if (matchingCircles.has(circle.id)) {
-                    circle.classList.remove('hidden');
-                } else {
-                    circle.classList.add('hidden');
-                }
-            });
-        }
-
-        // Обработчики событий для фильтров
-        document.getElementById('classFilter').addEventListener('change', filterCircles);
-        document.getElementById('familyFilter').addEventListener('change', filterCircles);
-        document.getElementById('genusFilter').addEventListener('change', filterCircles);
-        document.getElementById('speciesFilter').addEventListener('change', filterCircles);
-        document.getElementById('varietyFilter').addEventListener('change', filterCircles);
-
-        // Сброс фильтров
-        document.getElementById('resetFilters').addEventListener('click', () => {
-            document.querySelectorAll('select').forEach(select => select.value = '');
-            filterCircles();
-        });
 
         // Инициализация
         if (img.complete) {
@@ -191,4 +127,3 @@
     </script>
 </body>
 </html>
-

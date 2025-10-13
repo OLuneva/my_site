@@ -66,9 +66,19 @@
     </div>
 
     <script>
-        // Загружаем данные из localStorage
-        let circles = JSON.parse(localStorage.getItem('circles')) || [];
-        let tableData = JSON.parse(localStorage.getItem('tableData')) || [];
+        // Дефолтные данные для тестирования
+        const defaultCircles = [
+            { id: 'Круг1', x: 10, y: 10 },
+            { id: 'Круг2', x: 20, y: 20 }
+        ];
+        const defaultTableData = [
+            ['Класс1', 'Семейство1', 'Род1', 'Вид1', 'Сорт1'],
+            ['Класс2', 'Семейство2', 'Род2', 'Вид2', 'Сорт2']
+        ];
+
+        // Загружаем данные из localStorage с дефолтами
+        let circles = JSON.parse(localStorage.getItem('circles')) || defaultCircles;
+        let tableData = JSON.parse(localStorage.getItem('tableData')) || defaultTableData;
         let backgroundImageSrc = localStorage.getItem('backgroundImageSrc') || 'my-image.jpg';
 
         const img = document.getElementById('backgroundImage');
@@ -109,7 +119,7 @@
             Object.keys(filters).forEach(filterId => {
                 const select = document.getElementById(filterId);
                 const columnIndex = filters[filterId];
-                const uniqueValues = [...new Set(tableData.map(row => row[columnIndex]).filter(val => val))];
+                const uniqueValues = [...new Set(tableData.map(row => row[columnIndex]).filter(val => val && val.trim()))]; // Фильтруем пустые и пробелы
                 uniqueValues.forEach(value => {
                     const option = document.createElement('option');
                     option.value = value;

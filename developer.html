@@ -44,12 +44,7 @@
             margin-right: 10px;
         }
         #csvFile {
-            margin-left: 10px;
-        }
-        .info {
-            font-size: 0.9em;
-            color: #666;
-            margin-bottom: 10px;
+            display: none;
         }
     </style>
 </head>
@@ -66,10 +61,6 @@
             <button id="saveCircles">Сохранить круги</button>
         </div>
         
-        <div class="info">
-            <p>Инструкции: Перетаскивайте существующие круги (оранжевые) для изменения позиций. Добавляйте новые круги (красные) кнопкой "Добавить новый круг". Загружайте CSV с данными растений (колонки: Класс, Семейство, Род, Вид, Сорт, Круг). Все изменения сохраняются в localStorage.</p>
-        </div>
-        
         <img id="backgroundImage" src="my-image.jpg" alt="Фон с растениями">
     </div>
 
@@ -79,8 +70,8 @@
         let tableData = JSON.parse(localStorage.getItem('tableData')) || [];
         let newCircles = []; // Для отслеживания новых кругов в этой сессии
 
-        // Элемент для фона
         const img = document.getElementById('backgroundImage');
+
         img.onload = () => {
             renderCircles();
         };
@@ -220,4 +211,3 @@
     </script>
 </body>
 </html>
-

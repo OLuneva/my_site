@@ -1,200 +1,222 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Режим разработчика</title>
+    <title>Режим разработчика - Редактирование кругов</title>
     <style>
         body {
-            margin: 0;
-            padding: 0;
             font-family: Arial, sans-serif;
-            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
         }
-
-        #controls {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            background-color: white;
-            padding: 10px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            z-index: 20;
-        }
-
-        button {
-            padding: 5px 10px;
-            margin-right: 10px;
-            cursor: pointer;
-        }
-
-        #container {
-            margin-top: 100px;
+        .container {
             position: relative;
-            display: inline-block;
+            max-width: 800px;
+            margin: 0 auto;
         }
-
-        #image {
-            display: block;
-            max-width: 100%;
+        #backgroundImage {
+            width: 100%;
             height: auto;
+            position: relative;
+            border: 1px solid #ccc;
         }
-
         .circle {
             position: absolute;
             width: 20px;
             height: 20px;
             border-radius: 50%;
-            cursor: move;
-            z-index: 10;
+            cursor: pointer;
+            user-select: none;
         }
-
-        .old-circle {
-            background-color: orange; /* Старые круги */
+        .circle.existing {
+            background-color: orange;
         }
-
-        .new-circle {
-            background-color: red; /* Новые, не сохранённые */
+        .circle.new {
+            background-color: red;
+        }
+        .nav, .controls {
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 5px 10px;
+            margin-right: 10px;
+        }
+        #csvFile {
+            margin-left: 10px;
+        }
+        .info {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 10px;
         }
     </style>
 </head>
 <body>
-    <!-- Панель управления -->
-    <div id="controls">
-        <button id="save-button">Сохранить позиции</button>
-        <button id="add-circle-button">Добавить круг</button>
-    </div>
-
-    <!-- Контейнер с картинкой и кругами -->
-    <div id="container">
-        <img id="image" src="my-image.jpg" alt="Картинка">
+    <div class="container">
+        <div class="nav">
+            <button onclick="window.location.href='index.html'">Перейти в пользовательский режим</button>
+        </div>
+        
+        <div class="controls">
+            <button id="addCircle">Добавить новый круг</button>
+            <button id="loadCSV">Загрузить CSV</button>
+            <input type="file" id="csvFile" accept=".csv" style="display: none;">
+            <button id="saveCircles">Сохранить круги</button>
+        </div>
+        
+        <div class="info">
+            <p>Инструкции: Перетаскивайте существующие круги (оранжевые) для изменения позиций. Добавляйте новые круги (красные) кнопкой "Добавить новый круг". Загружайте CSV с данными растений (колонки: Класс, Семейство, Род, Вид, Сорт, Круг). Все изменения сохраняются в localStorage.</p>
+        </div>
+        
+        <img id="backgroundImage" src="background.jpg" alt="Фон с растениями">
     </div>
 
     <script>
-        const container = document.getElementById('container');
-        const saveBtn = document.getElementById('save-button');
-        const addCircleBtn = document.getElementById('add-circle-button');
+        // Загружаем данные из localStorage
+        let circles = JSON.parse(localStorage.getItem('circles')) || [];
+        let tableData = JSON.parse(localStorage.getItem('tableData')) || [];
+        let newCircles = []; // Для отслеживания новых кругов в этой сессии
 
+        // Элемент для фона
+        const img = document.getElementById('backgroundImage');
+        img.onload = () => {
+            renderCircles();
+        };
+
+        // Функция для рендеринга кругов
+        function renderCircles() {
+            // Удаляем старые круги
+            document.querySelectorAll('.circle').forEach(c => c.remove());
+            
+            // Создаём круги
+            circles.forEach(circle => {
+                const circleEl = document.createElement('div');
+                circleEl.className = 'circle existing';
+                circleEl.id = circle.id;
+                circleEl.style.left = `${circle.x}%`;
+                circleEl.style.top = `${circle.y}%`;
+                circleEl.draggable = true;
+                circleEl.title = `Круг: ${circle.id}`;
+                img.appendChild(circleEl);
+                
+                // Drag-and-drop
+                circleEl.addEventListener('dragstart', handleDragStart);
+                circleEl.addEventListener('dragend', handleDragEnd);
+            });
+            
+            // Новые круги (красные)
+            newCircles.forEach(circle => {
+                const circleEl = document.createElement('div');
+                circleEl.className = 'circle new';
+                circleEl.id = circle.id;
+                circleEl.style.left = `${circle.x}%`;
+                circleEl.style.top = `${circle.y}%`;
+                circleEl.draggable = true;
+                circleEl.title = `Новый круг: ${circle.id}`;
+                img.appendChild(circleEl);
+                
+                // Drag-and-drop для новых
+                circleEl.addEventListener('dragstart', handleDragStart);
+                circleEl.addEventListener('dragend', handleDragEnd);
+            });
+        }
+
+        // Drag-and-drop handlers
         let draggedCircle = null;
-        let offsetX, offsetY;
-        let circleCounter = 1;
 
-        function createCircle(id, top = '50%', left = '50%', isOld = false) {
-            const circle = document.createElement('div');
-            circle.id = id;
-            circle.className = 'circle';
-            if (isOld) {
-                circle.classList.add('old-circle');
+        function handleDragStart(e) {
+            draggedCircle = e.target;
+            e.dataTransfer.effectAllowed = 'move';
+        }
+
+        function handleDragEnd(e) {
+            if (!draggedCircle) return;
+            
+            const rect = img.getBoundingClientRect();
+            let newX = ((e.clientX - rect.left) / rect.width) * 100;
+            let newY = ((e.clientY - rect.top) / rect.height) * 100;
+            
+            // Ограничиваем в пределах 0-100%
+            newX = Math.max(0, Math.min(100, newX));
+            newY = Math.max(0, Math.min(100, newY));
+            
+            draggedCircle.style.left = `${newX}%`;
+            draggedCircle.style.top = `${newY}%`;
+            
+            // Обновляем данные
+            const id = draggedCircle.id;
+            const isNew = newCircles.some(c => c.id === id);
+            if (isNew) {
+                const index = newCircles.findIndex(c => c.id === id);
+                newCircles[index].x = newX;
+                newCircles[index].y = newY;
             } else {
-                circle.classList.add('new-circle');
+                const index = circles.findIndex(c => c.id === id);
+                circles[index].x = newX;
+                circles[index].y = newY;
             }
-            circle.style.top = top;
-            circle.style.left = left;
-            container.appendChild(circle);
-            return circle;
-        }
-
-        function saveDefaultCircles() {
-            const circles = document.querySelectorAll('.circle');
-            const circleIds = [];
-            circles.forEach(circle => {
-                const id = circle.id;
-                circleIds.push(id);
-                const top = circle.style.top || '50%';
-                const left = circle.style.left || '50%';
-                localStorage.setItem(id, JSON.stringify({ top, left }));
-            });
-            localStorage.setItem('circles', JSON.stringify(circleIds));
-        }
-
-        function loadCircles() {
-            const savedCircles = localStorage.getItem('circles');
-            if (savedCircles) {
-                const circleIds = JSON.parse(savedCircles);
-                circleIds.forEach(id => {
-                    const savedPos = localStorage.getItem(id);
-                    let top = '50%', left = '50%';
-                    if (savedPos) {
-                        ({ top, left } = JSON.parse(savedPos));
-                    }
-                    createCircle(id, top, left, true); // Все загруженные - старые (оранжевые)
-                });
-                circleCounter = circleIds.length + 1;
-            } else {
-                // Дефолтные круги
-                createCircle('circle1', '10%', '10%', true);
-                createCircle('circle2', '50%', '50%', true);
-                createCircle('circle3', '80%', '80%', true);
-                circleCounter = 4;
-                saveDefaultCircles(); // Сохраняем дефолтные в localStorage
-            }
-        }
-
-        function savePositions() {
-            const circles = document.querySelectorAll('.circle');
-            const circleIds = [];
-            circles.forEach(circle => {
-                const id = circle.id;
-                circleIds.push(id);
-                const rect = circle.getBoundingClientRect();
-                const containerRect = container.getBoundingClientRect();
-                const top = ((rect.top - containerRect.top) / containerRect.height * 100) + '%';
-                const left = ((rect.left - containerRect.left) / containerRect.width * 100) + '%';
-                localStorage.setItem(id, JSON.stringify({ top, left }));
-            });
-            localStorage.setItem('circles', JSON.stringify(circleIds));
-            alert('Позиции сохранены!');
-            // После сохранения все круги становятся "старыми" (оранжевыми)
-            document.querySelectorAll('.new-circle').forEach(circle => {
-                circle.classList.remove('new-circle');
-                circle.classList.add('old-circle');
-            });
-        }
-
-        saveBtn.addEventListener('click', savePositions);
-
-        addCircleBtn.addEventListener('click', () => {
-            const circles = document.querySelectorAll('.circle');
-            let lastTop = 50, lastLeft = 50;
-            if (circles.length > 0) {
-                const lastCircle = circles[circles.length - 1];
-                lastTop = parseFloat(lastCircle.style.top) || 50;
-                lastLeft = parseFloat(lastCircle.style.left) || 50;
-            }
-            const newTop = (lastTop + 5) + '%';
-            const newLeft = (lastLeft + 5) + '%';
-            const newId = `circle${circleCounter}`;
-            createCircle(newId, newTop, newLeft, false); // Новые - красные
-            circleCounter++;
-        });
-
-        // Drag-and-drop
-        document.addEventListener('mousedown', (e) => {
-            if (e.target.classList.contains('circle')) {
-                draggedCircle = e.target;
-                const rect = draggedCircle.getBoundingClientRect();
-                const containerRect = container.getBoundingClientRect();
-                offsetX = e.clientX - rect.left - rect.width / 2;
-                offsetY = e.clientY - rect.top - rect.height / 2;
-            }
-        });
-
-        document.addEventListener('mousemove', (e) => {
-            if (draggedCircle) {
-                const containerRect = container.getBoundingClientRect();
-                const newLeftPercent = ((e.clientX - containerRect.left - offsetX - draggedCircle.offsetWidth / 2) / containerRect.width * 100) + '%';
-                const newTopPercent = ((e.clientY - containerRect.top - offsetY - draggedCircle.offsetHeight / 2) / containerRect.height * 100) + '%';
-                draggedCircle.style.left = newLeftPercent;
-                draggedCircle.style.top = newTopPercent;
-            }
-        });
-
-        document.addEventListener('mouseup', () => {
+            
             draggedCircle = null;
+        }
+
+        // Добавление нового круга
+        document.getElementById('addCircle').addEventListener('click', () => {
+            // Генерируем новый ID (например, Круг1, Круг2 и т.д.)
+            const existingIds = circles.concat(newCircles).map(c => parseInt(c.id.replace('Круг', '')));
+            const newIdNum = existingIds.length ? Math.max(...existingIds) + 1 : 1;
+            const newId = `Круг${newIdNum}`;
+            
+            // Позиция: смещение на +5% от последнего круга
+            let lastCircle = circles[circles.length - 1] || newCircles[newCircles.length - 1];
+            let newX = lastCircle ? lastCircle.x + 5 : 10;
+            let newY = lastCircle ? lastCircle.y + 5 : 10;
+            newX = Math.min(100, newX);
+            newY = Math.min(100, newY);
+            
+            const newCircle = { id: newId, x: newX, y: newY };
+            newCircles.push(newCircle);
+            renderCircles();
         });
 
-        loadCircles();
+        // Загрузка CSV
+        document.getElementById('loadCSV').addEventListener('click', () => {
+            document.getElementById('csvFile').click();
+        });
+
+        document.getElementById('csvFile').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const csvText = event.target.result;
+                // Парсим CSV (простой парсер, предполагаем разделитель запятой)
+                const rows = csvText.split('\n').map(row => row.split(','));
+                // Убираем заголовок, если есть
+                if (rows[0][0].toLowerCase().includes('класс')) rows.shift();
+                tableData = rows.filter(row => row.length > 1); // Убираем пустые строки
+                localStorage.setItem('tableData', JSON.stringify(tableData));
+                alert('CSV загружен и сохранён!');
+            };
+            reader.readAsText(file);
+        });
+
+        // Сохранение кругов
+        document.getElementById('saveCircles').addEventListener('click', () => {
+            // Объединяем существующие и новые круги
+            circles = circles.concat(newCircles);
+            newCircles = []; // Очищаем новые
+            localStorage.setItem('circles', JSON.stringify(circles));
+            renderCircles();
+            alert('Круги сохранены!');
+        });
+
+        // Инициализация
+        if (img.complete) {
+            renderCircles();
+        }
     </script>
 </body>
 </html>

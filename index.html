@@ -1,148 +1,125 @@
 <!DOCTYPE html>
-
-<html lang="ru">
-
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Анимированные фигуры с картинкой и кругом</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            background-image: url('План.jpg'); /* Замени на имя своей картинки, например 'background.png'. Она должна быть в том же репозитории. */
+            background-size: cover; /* Картинка растягивается на весь экран */
+            background-position: center;
+            background-repeat: no-repeat;
+            overflow: hidden; /* Убираем скролл */
+        }
 
-<meta charset="UTF-8" />
+        #mouse-circle {
+            position: absolute;
+            width: 20px; /* Диаметр круга (маленький) */
+            height: 20px;
+            background-color: red; /* Цвет круга */
+            border-radius: 50%; /* Делаем круглым */
+            z-index: 10; /* Над другими элементами */
+            cursor: grab; /* Курсор при наведении */
+        }
 
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        #mouse-circle:active {
+            cursor: grabbing; /* Курсор при перетаскивании */
+        }
 
-<title>Фигуры</title>
+        /* Стили для оригинальных фигур (оставил для примера) */
+        .shape {
+            position: absolute;
+            animation: move 5s infinite linear;
+        }
 
-<style>
+        .circle {
+            width: 50px;
+            height: 50px;
+            background-color: blue;
+            border-radius: 50%;
+        }
 
-  body { font-family: Arial, sans-serif; text-align: center; margin: 20px; }
+        .square {
+            width: 50px;
+            height: 50px;
+            background-color: green;
+        }
 
-  #canvas { margin-top: 20px; }
+        .triangle {
+            width: 0;
+            height: 0;
+            border-left: 25px solid transparent;
+            border-right: 25px solid transparent;
+            border-bottom: 50px solid yellow;
+        }
 
-  .shape { width: 100px; height: 100px; margin: 10px auto; }
-
-  .circle { border-radius: 50%; background-color: #4CAF50; }
-
-  .square { background-color: #2196F3; }
-
-  .triangle {
-
-    width: 0; 
-
-    height: 0; 
-
-    border-left: 50px solid transparent;
-
-    border-right: 50px solid transparent;
-
-    border-bottom: 100px solid #f44336;
-
-    background: transparent;
-
-    margin: 20px auto;
-
-  }
-
-  /* Мигающий эффект */
-
-  @keyframes blink {
-
-    0%, 50%, 100% { opacity: 1; }
-
-    25%, 75% { opacity: 0; }
-
-  }
-
-  .blink {
-
-    animation: blink 1s infinite;
-
-  }
-
-</style>
-
+        @keyframes move {
+            0% { transform: translate(0, 0); }
+            25% { transform: translate(100vw, 0); }
+            50% { transform: translate(100vw, 100vh); }
+            75% { transform: translate(0, 100vh); }
+            100% { transform: translate(0, 0); }
+        }
+    </style>
 </head>
-
 <body>
+    <!-- Маленький круг, который двигается только при drag -->
+    <div id="mouse-circle"></div>
 
-<h1>Выберите фигуру</h1>
+    <!-- Оригинальные анимированные фигуры (можно убрать, если не нужны) -->
+    <div class="shape circle" style="top: 10%; left: 10%;"></div>
+    <div class="shape square" style="top: 20%; left: 20%;"></div>
+    <div class="shape triangle" style="top: 30%; left: 30%;"></div>
 
-<select id="shapeSelect">
+    <script>
+        // Получаем элемент круга
+        const mouseCircle = document.getElementById('mouse-circle');
 
-  <option value="">--Выберите фигуру--</option>
+        // Переменные для состояния
+        let isDragging = false; // Зажата ли левая кнопка
+        let isHovering = false; // Мышь над кругом
 
-  <option value="circle">Круг</option>
+        // Функция для обновления позиции круга (только если dragging)
+        function moveCircle(event) {
+            if (isDragging) {
+                // Получаем координаты мыши
+                const x = event.clientX;
+                const y = event.clientY;
 
-  <option value="square">Квадрат</option>
+                // Устанавливаем позицию круга (центрируем его на курсоре)
+                mouseCircle.style.left = (x - 10) + 'px'; // -10, чтобы центр круга совпадал с курсором
+                mouseCircle.style.top = (y - 10) + 'px';
+            }
+        }
 
-  <option value="triangle">Треугольник</option>
+        // События на круге
+        mouseCircle.addEventListener('mouseenter', () => {
+            isHovering = true;
+        });
 
-</select>
+        mouseCircle.addEventListener('mouseleave', () => {
+            isHovering = false;
+        });
 
-<div id="canvas"></div>
+        mouseCircle.addEventListener('mousedown', (event) => {
+            if (event.button === 0 && isHovering) { // Левая кнопка и мышь на круге
+                isDragging = true;
+                event.preventDefault(); // Предотвращаем выделение текста и т.д.
+            }
+        });
 
-<script>
+        // mouseup на документе, чтобы отлавливать даже если мышь ушла с круга
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
 
-const select = document.getElementById('shapeSelect');
-
-const canvas = document.getElementById('canvas');
-
-let currentShape = null;
-
-select.addEventListener('change', () => {
-
-  // Удаляем предыдущую фигуру
-
-  if (currentShape) {
-
-    currentShape.classList.remove('blink');
-
-    currentShape.remove();
-
-    currentShape = null;
-
-  }
-
-  const shapeType = select.value;
-
-  if (!shapeType) return;
-
-  // Создаём новую фигуру
-
-  const shape = document.createElement('div');
-
-  shape.classList.add('shape');
-
-  
-
-  if (shapeType === 'circle') {
-
-    shape.classList.add('circle');
-
-  } else if (shapeType === 'square') {
-
-    shape.classList.add('square');
-
-  } else if (shapeType === 'triangle') {
-
-    shape.classList.add('triangle');
-
-  }
-  
-
-  // Добавляем мигающий эффект
-
-  shape.classList.add('blink');
-
-  
-
-  // Добавляем фигуру в canvas
-
-  canvas.appendChild(shape);
-
-  currentShape = shape;
-
-});
-
-</script>
-
+        // Добавляем слушатель для движения мыши
+        document.addEventListener('mousemove', moveCircle);
+    </script>
 </body>
+</html>
 
-</html>  

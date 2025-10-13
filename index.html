@@ -43,8 +43,8 @@
             cursor: pointer;
         }
 
-        /* Кнопка сохранения (видима только в режиме разработчика) */
-        #save-button {
+        /* Кнопка сохранения и добавления (видима только в режиме разработчика) */
+        #save-button, #add-circle-button {
             display: none;
         }
 
@@ -94,9 +94,6 @@
         <label for="circle-select">Выберите круг:</label>
         <select id="circle-select">
             <option value="">-- Выберите --</option>
-            <option value="circle1">Круг 1</option>
-            <option value="circle2">Круг 2</option>
-            <option value="circle3">Круг 3</option>
         </select>
 
         <!-- Кнопки для переключения режимов -->
@@ -104,6 +101,7 @@
             <button id="user-mode">Режим пользователя</button>
             <button id="developer-mode">Режим разработчика</button>
             <button id="save-button">Сохранить позиции</button>
+            <button id="add-circle-button">Добавить круг</button>
         </div>
     </div>
 
@@ -111,56 +109,89 @@
     <div id="container">
         <!-- Картинка (замени 'my-image.jpg' на своё изображение) -->
         <img id="image" src="my-image.jpg" alt="Картинка">
-
-        <!-- Круги в определённых местах (позиции будут загружаться из localStorage) -->
-        <div id="circle1" class="circle" style="top: 10%; left: 10%;"></div>
-        <div id="circle2" class="circle" style="top: 50%; left: 50%;"></div>
-        <div id="circle3" class="circle" style="top: 80%; left: 80%;"></div>
     </div>
 
     <script>
         // Получаем элементы
         const select = document.getElementById('circle-select');
-        const circles = document.querySelectorAll('.circle');
+        const container = document.getElementById('container');
+        const image = document.getElementById('image');
         const userModeBtn = document.getElementById('user-mode');
         const developerModeBtn = document.getElementById('developer-mode');
         const saveBtn = document.getElementById('save-button');
-        const container = document.getElementById('container');
-        const image = document.getElementById('image');
+        const addCircleBtn = document.getElementById('add-circle-button');
 
         let isDeveloperMode = false; // Флаг режима
         let draggedCircle = null; // Текущий перетаскиваемый круг
         let offsetX, offsetY; // Смещение мыши от центра круга
+        let circleCounter = 1; // Счётчик для ID новых кругов
 
-        // Функция для загрузки позиций из localStorage
-        function loadPositions() {
-            circles.forEach(circle => {
-                const id = circle.id;
-                const savedPos = localStorage.getItem(id);
-                if (savedPos) {
-                    const { top, left } = JSON.parse(savedPos);
-                    circle.style.top = top;
-                    circle.style.left = left;
-                }
+        // Функция для создания круга
+        function createCircle(id, top = '50%', left = '50%') {
+            const circle = document.createElement('div');
+            circle.id = id;
+            circle.className = 'circle';
+            circle.style.top = top;
+            circle.style.left = left;
+            container.appendChild(circle);
+            return circle;
+        }
+
+        // Функция для загрузки кругов из localStorage
+        function loadCircles() {
+            const savedCircles = localStorage.getItem('circles');
+            if (savedCircles) {
+                const circleIds = JSON.parse(savedCircles);
+                circleIds.forEach(id => {
+                    const savedPos = localStorage.getItem(id);
+                    let top = '50%', left = '50%';
+                    if (savedPos) {
+                        ({ top, left } = JSON.parse(savedPos));
+                    }
+                    createCircle(id, top, left);
+                });
+                circleCounter = circleIds.length + 1; // Обновляем счётчик
+            } else {
+                // Дефолтные круги
+                createCircle('circle1', '10%', '10%');
+                createCircle('circle2', '50%', '50%');
+                createCircle('circle3', '80%', '80%');
+                circleCounter = 4;
+            }
+            updateSelect(); // Обновляем селект
+        }
+
+        // Функция для обновления опций в select
+        function updateSelect() {
+            select.innerHTML = '<option value="">-- Выберите --</option>';
+            document.querySelectorAll('.circle').forEach(circle => {
+                const option = document.createElement('option');
+                option.value = circle.id;
+                option.textContent = circle.id.replace('circle', 'Круг ');
+                select.appendChild(option);
             });
         }
 
         // Функция для сохранения позиций в localStorage
         function savePositions() {
+            const circles = document.querySelectorAll('.circle');
+            const circleIds = [];
             circles.forEach(circle => {
                 const id = circle.id;
+                circleIds.push(id);
                 const rect = circle.getBoundingClientRect();
                 const containerRect = container.getBoundingClientRect();
                 const top = ((rect.top - containerRect.top) / containerRect.height * 100) + '%';
                 const left = ((rect.left - containerRect.left) / containerRect.width * 100) + '%';
                 localStorage.setItem(id, JSON.stringify({ top, left }));
             });
+            localStorage.setItem('circles', JSON.stringify(circleIds));
             alert('Позиции сохранены!');
         }
 
         // Функция для сброса мигания всех кругов
         function resetBlinks() {
-            circles.forEach(circle => circle.classList.remove('blink'));
+            document.querySelectorAll('.circle').forEach(circle => circle.classList.remove('blink'));
         }
 
         // Обработчик изменения выбора в фильтре (только в режиме пользователя)
@@ -182,7 +213,8 @@
             isDeveloperMode = false;
             select.style.display = 'inline';
             saveBtn.style.display = 'none';
-            circles.forEach(circle => {
+            addCircleBtn.style.display = 'none';
+            document.querySelectorAll('.circle').forEach(circle => {
                 circle.classList.remove('developer');
                 circle.style.cursor = 'pointer';
             });
@@ -194,7 +226,8 @@
             isDeveloperMode = true;
             select.style.display = 'none';
             saveBtn.style.display = 'inline';
-            circles.forEach(circle => {
+            addCircleBtn.style.display = 'inline';
+            document.querySelectorAll('.circle').forEach(circle => {
                 circle.classList.add('developer');
                 circle.classList.remove('blink'); // Убираем мигания в режиме разработчика
             });
@@ -203,16 +236,24 @@
         // Сохранение позиций
         saveBtn.addEventListener('click', savePositions);
 
-        // Drag-and-drop для кругов в режиме разработчика
-        circles.forEach(circle => {
-            circle.addEventListener('mousedown', (e) => {
-                if (isDeveloperMode) {
-                    draggedCircle = circle;
-                    const rect = circle.getBoundingClientRect();
-                    offsetX = e.clientX - rect.left - rect.width / 2;
-                    offsetY = e.clientY - rect.top - rect.height / 2;
-                }
-            });
+        // Добавление нового круга
+        addCircleBtn.addEventListener('click', () => {
+            if (isDeveloperMode) {
+                const newId = `circle${circleCounter}`;
+                createCircle(newId, '50%', '50%');
+                circleCounter++;
+                updateSelect(); // Обновляем селект
+            }
+        });
+
+        // Drag-and-drop для кругов в режиме разработчика (теперь без ограничений)
+        document.addEventListener('mousedown', (e) => {
+            if (isDeveloperMode && e.target.classList.contains('circle')) {
+                draggedCircle = e.target;
+                const rect = draggedCircle.getBoundingClientRect();
+                offsetX = e.clientX - rect.left - rect.width / 2;
+                offsetY = e.clientY - rect.top - rect.height / 2;
+            }
         });
 
         document.addEventListener('mousemove', (e) => {
@@ -220,11 +261,9 @@
                 const containerRect = container.getBoundingClientRect();
                 const newLeft = e.clientX - containerRect.left - offsetX;
                 const newTop = e.clientY - containerRect.top - offsetY;
-                // Ограничиваем движение в пределах контейнера
-                const maxLeft = containerRect.width - draggedCircle.offsetWidth;
-                const maxTop = containerRect.height - draggedCircle.offsetHeight;
-                draggedCircle.style.left = Math.max(0, Math.min(newLeft, maxLeft)) + 'px';
-                draggedCircle.style.top = Math.max(0, Math.min(newTop, maxTop)) + 'px';
+                // Убираем ограничения, чтобы двигать по всему экрану (относительно контейнера)
+                draggedCircle.style.left = newLeft + 'px';
+                draggedCircle.style.top = newTop + 'px';
             }
         });
 
@@ -232,8 +271,8 @@
             draggedCircle = null;
         });
 
-        // Инициализация: загружаем позиции при загрузке страницы
-        loadPositions();
+        // Инициализация: загружаем круги при загрузке страницы
+        loadCircles();
     </script>
 </body>
 </html>

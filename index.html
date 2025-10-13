@@ -3,123 +3,118 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Анимированные фигуры с картинкой и кругом</title>
+    <title>Картинка с кругами и фильтром</title>
     <style>
         body {
             margin: 0;
             padding: 0;
-            height: 100vh;
-            background-image: url('План.jpg'); /* Замени на имя своей картинки, например 'background.png'. Она должна быть в том же репозитории. */
-            background-size: cover; /* Картинка растягивается на весь экран */
-            background-position: center;
-            background-repeat: no-repeat;
-            overflow: hidden; /* Убираем скролл */
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0; /* Фон страницы */
         }
 
-        #mouse-circle {
-            position: absolute;
-            width: 20px; /* Диаметр круга (маленький) */
-            height: 20px;
-            background-color: red; /* Цвет круга */
-            border-radius: 50%; /* Делаем круглым */
-            z-index: 10; /* Над другими элементами */
-            cursor: grab; /* Курсор при наведении */
+        /* Фильтр сверху */
+        #filter {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background-color: white;
+            padding: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            z-index: 20;
         }
 
-        #mouse-circle:active {
-            cursor: grabbing; /* Курсор при перетаскивании */
+        #filter label {
+            margin-right: 10px;
         }
 
-        /* Стили для оригинальных фигур (оставил для примера) */
-        .shape {
-            position: absolute;
-            animation: move 5s infinite linear;
+        #filter select {
+            padding: 5px;
         }
 
+        /* Контейнер для картинки и кругов */
+        #container {
+            margin-top: 60px; /* Отступ под фильтр */
+            position: relative;
+            display: inline-block; /* Чтобы контейнер обёртывал картинку */
+        }
+
+        #image {
+            display: block; /* Убираем отступы по умолчанию */
+            max-width: 100%; /* Картинка не растягивается на весь экран, но адаптируется под ширину */
+            height: auto; /* Сохраняем пропорции */
+        }
+
+        /* Стили для кругов */
         .circle {
-            width: 50px;
-            height: 50px;
-            background-color: blue;
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background-color: red;
             border-radius: 50%;
+            cursor: pointer;
+            z-index: 10;
         }
 
-        .square {
-            width: 50px;
-            height: 50px;
-            background-color: green;
+        /* Анимация мигания жёлтым */
+        .blink {
+            animation: blink-yellow 1s infinite;
         }
 
-        .triangle {
-            width: 0;
-            height: 0;
-            border-left: 25px solid transparent;
-            border-right: 25px solid transparent;
-            border-bottom: 50px solid yellow;
-        }
-
-        @keyframes move {
-            0% { transform: translate(0, 0); }
-            25% { transform: translate(100vw, 0); }
-            50% { transform: translate(100vw, 100vh); }
-            75% { transform: translate(0, 100vh); }
-            100% { transform: translate(0, 0); }
+        @keyframes blink-yellow {
+            0%, 50% { background-color: red; }
+            25%, 75% { background-color: yellow; }
         }
     </style>
 </head>
 <body>
-    <!-- Маленький круг, который двигается только при drag -->
-    <div id="mouse-circle"></div>
+    <!-- Фильтр для выбора круга -->
+    <div id="filter">
+        <label for="circle-select">Выберите круг:</label>
+        <select id="circle-select">
+            <option value="">-- Выберите --</option>
+            <option value="circle1">Круг 1</option>
+            <option value="circle2">Круг 2</option>
+            <option value="circle3">Круг 3</option>
+        </select>
+    </div>
 
-    <!-- Оригинальные анимированные фигуры (можно убрать, если не нужны) -->
-    <div class="shape circle" style="top: 10%; left: 10%;"></div>
-    <div class="shape square" style="top: 20%; left: 20%;"></div>
-    <div class="shape triangle" style="top: 30%; left: 30%;"></div>
+    <!-- Контейнер с картинкой и кругами -->
+    <div id="container">
+        <!-- Картинка (замени 'my-image.jpg' на своё изображение) -->
+        <img id="image" src="my-image.jpg" alt="Картинка">
+
+        <!-- Круги в определённых местах (позиции заданы относительно картинки) -->
+        <!-- Пример: круг 1 в верхнем левом углу, круг 2 в центре, круг 3 внизу справа -->
+        <!-- Настрой позиции под свою картинку -->
+        <div id="circle1" class="circle" style="top: 10%; left: 10%;"></div>
+        <div id="circle2" class="circle" style="top: 50%; left: 50%;"></div>
+        <div id="circle3" class="circle" style="top: 80%; left: 80%;"></div>
+    </div>
 
     <script>
-        // Получаем элемент круга
-        const mouseCircle = document.getElementById('mouse-circle');
+        // Получаем элементы
+        const select = document.getElementById('circle-select');
+        const circles = document.querySelectorAll('.circle');
 
-        // Переменные для состояния
-        let isDragging = false; // Зажата ли левая кнопка
-        let isHovering = false; // Мышь над кругом
-
-        // Функция для обновления позиции круга (только если dragging)
-        function moveCircle(event) {
-            if (isDragging) {
-                // Получаем координаты мыши
-                const x = event.clientX;
-                const y = event.clientY;
-
-                // Устанавливаем позицию круга (центрируем его на курсоре)
-                mouseCircle.style.left = (x - 10) + 'px'; // -10, чтобы центр круга совпадал с курсором
-                mouseCircle.style.top = (y - 10) + 'px';
-            }
+        // Функция для сброса мигания всех кругов
+        function resetBlinks() {
+            circles.forEach(circle => circle.classList.remove('blink'));
         }
 
-        // События на круге
-        mouseCircle.addEventListener('mouseenter', () => {
-            isHovering = true;
-        });
-
-        mouseCircle.addEventListener('mouseleave', () => {
-            isHovering = false;
-        });
-
-        mouseCircle.addEventListener('mousedown', (event) => {
-            if (event.button === 0 && isHovering) { // Левая кнопка и мышь на круге
-                isDragging = true;
-                event.preventDefault(); // Предотвращаем выделение текста и т.д.
+        // Обработчик изменения выбора в фильтре
+        select.addEventListener('change', (event) => {
+            resetBlinks(); // Сбрасываем все мигания
+            const selectedValue = event.target.value;
+            if (selectedValue) {
+                const selectedCircle = document.getElementById(selectedValue);
+                if (selectedCircle) {
+                    selectedCircle.classList.add('blink'); // Добавляем анимацию мигания
+                }
             }
         });
-
-        // mouseup на документе, чтобы отлавливать даже если мышь ушла с круга
-        document.addEventListener('mouseup', () => {
-            isDragging = false;
-        });
-
-        // Добавляем слушатель для движения мыши
-        document.addEventListener('mousemove', moveCircle);
     </script>
 </body>
 </html>
+
 

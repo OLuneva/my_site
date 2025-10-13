@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Режим разработчика</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+        }
+
+        #controls {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background-color: white;
+            padding: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            z-index: 20;
+        }
+
+        button {
+            padding: 5px 10px;
+            margin-right: 10px;
+            cursor: pointer;
+        }
+
+        #container {
+            margin-top: 100px;
+            position: relative;
+            display: inline-block;
+        }
+
+        #image {
+            display: block;
+            max-width: 100%;
+            height: auto;
+        }
+
+        .circle {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            cursor: move;
+            z-index: 10;
+        }
+
+        .old-circle {
+            background-color: orange; /* Старые круги */
+        }
+
+        .new-circle {
+            background-color: red; /* Новые, не сохранённые */
+        }
+    </style>
+</head>
+<body>
+    <!-- Панель управления -->
+    <div id="controls">
+        <button id="save-button">Сохранить позиции</button>
+        <button id="add-circle-button">Добавить круг</button>
+    </div>
+
+    <!-- Контейнер с картинкой и кругами -->
+    <div id="container">
+        <img id="image" src="my-image.jpg" alt="Картинка">
+    </div>
+
+    <script>
+        const container = document.getElementById('container');
+        const saveBtn = document.getElementById('save-button');
+        const addCircleBtn = document.getElementById('add-circle-button');
+
+        let draggedCircle = null;
+        let offsetX, offsetY;
+        let circleCounter = 1;
+
+        function createCircle(id, top = '50%', left = '50%', isOld = false) {
+            const circle = document.createElement('div');
+            circle.id = id;
+            circle.className = 'circle';
+            if (isOld) {
+                circle.classList.add('old-circle');
+            } else {
+                circle.classList.add('new-circle');
+            }
+            circle.style.top = top;
+            circle.style.left = left;
+            container.appendChild(circle);
+            return circle;
+        }
+
+        function saveDefaultCircles() {
+            const circles = document.querySelectorAll('.circle');
+            const circleIds = [];
+            circles.forEach(circle => {
+                const id = circle.id;
+                circleIds.push(id);
+                const top = circle.style.top || '50%';
+                const left = circle.style.left || '50%';
+                localStorage.setItem(id, JSON.stringify({ top, left }));
+            });
+            localStorage.setItem('circles', JSON.stringify(circleIds));
+        }
+
+        function loadCircles() {
+            const savedCircles = localStorage.getItem('circles');
+            if (savedCircles) {
+                const circleIds = JSON.parse(savedCircles);
+                circleIds.forEach(id => {
+                    const savedPos = localStorage.getItem(id);
+                    let top = '50%', left = '50%';
+                    if (savedPos) {
+                        ({ top, left } = JSON.parse(savedPos));
+                    }
+                    createCircle(id, top, left, true); // Все загруженные - старые (оранжевые)
+                });
+                circleCounter = circleIds.length + 1;
+            } else {
+                // Дефолтные круги
+                createCircle('circle1', '10%', '10%', true);
+                createCircle('circle2', '50%', '50%', true);
+                createCircle('circle3', '80%', '80%', true);
+                circleCounter = 4;
+                saveDefaultCircles(); // Сохраняем дефолтные в localStorage
+            }
+        }
+
+        function savePositions() {
+            const circles = document.querySelectorAll('.circle');
+            const circleIds = [];
+            circles.forEach(circle => {
+                const id = circle.id;
+                circleIds.push(id);
+                const rect = circle.getBoundingClientRect();
+                const containerRect = container.getBoundingClientRect();
+                const top = ((rect.top - containerRect.top) / containerRect.height * 100) + '%';
+                const left = ((rect.left - containerRect.left) / containerRect.width * 100) + '%';
+                localStorage.setItem(id, JSON.stringify({ top, left }));
+            });
+            localStorage.setItem('circles', JSON.stringify(circleIds));
+            alert('Позиции сохранены!');
+            // После сохранения все круги становятся "старыми" (оранжевыми)
+            document.querySelectorAll('.new-circle').forEach(circle => {
+                circle.classList.remove('new-circle');
+                circle.classList.add('old-circle');
+            });
+        }
+
+        saveBtn.addEventListener('click', savePositions);
+
+        addCircleBtn.addEventListener('click', () => {
+            const circles = document.querySelectorAll('.circle');
+            let lastTop = 50, lastLeft = 50;
+            if (circles.length > 0) {
+                const lastCircle = circles[circles.length - 1];
+                lastTop = parseFloat(lastCircle.style.top) || 50;
+                lastLeft = parseFloat(lastCircle.style.left) || 50;
+            }
+            const newTop = (lastTop + 5) + '%';
+            const newLeft = (lastLeft + 5) + '%';
+            const newId = `circle${circleCounter}`;
+            createCircle(newId, newTop, newLeft, false); // Новые - красные
+            circleCounter++;
+        });
+
+        // Drag-and-drop
+        document.addEventListener('mousedown', (e) => {
+            if (e.target.classList.contains('circle')) {
+                draggedCircle = e.target;
+                const rect = draggedCircle.getBoundingClientRect();
+                const containerRect = container.getBoundingClientRect();
+                offsetX = e.clientX - rect.left - rect.width / 2;
+                offsetY = e.clientY - rect.top - rect.height / 2;
+            }
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (draggedCircle) {
+                const containerRect = container.getBoundingClientRect();
+                const newLeftPercent = ((e.clientX - containerRect.left - offsetX - draggedCircle.offsetWidth / 2) / containerRect.width * 100) + '%';
+                const newTopPercent = ((e.clientY - containerRect.top - offsetY - draggedCircle.offsetHeight / 2) / containerRect.height * 100) + '%';
+                draggedCircle.style.left = newLeftPercent;
+                draggedCircle.style.top = newTopPercent;
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            draggedCircle = null;
+        });
+
+        loadCircles();
+    </script>
+</body>
+</html>

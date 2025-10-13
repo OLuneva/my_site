@@ -43,6 +43,9 @@
             padding: 5px 10px;
             margin-right: 10px;
         }
+        #imageFile {
+            display: none;
+        }
         #csvFile {
             display: none;
         }
@@ -56,6 +59,8 @@
         
         <div class="controls">
             <button id="addCircle">Добавить новый круг</button>
+            <button id="loadImage">Загрузить изображение</button>
+            <input type="file" id="imageFile" accept="image/*" style="display: none;">
             <button id="loadCSV">Загрузить CSV</button>
             <input type="file" id="csvFile" accept=".csv" style="display: none;">
             <button id="saveCircles">Сохранить круги</button>
@@ -65,12 +70,24 @@
     </div>
 
     <script>
-        // Загружаем данные из localStorage
-        let circles = JSON.parse(localStorage.getItem('circles')) || [];
-        let tableData = JSON.parse(localStorage.getItem('tableData')) || [];
-        let newCircles = []; // Для отслеживания новых кругов в этой сессии
+        // Дефолтные данные для тестирования
+        const defaultCircles = [
+            { id: 'Круг1', x: 10, y: 10 },
+            { id: 'Круг2', x: 20, y: 20 }
+        ];
+        const defaultTableData = [
+            ['Класс1', 'Семейство1', 'Род1', 'Вид1', 'Сорт1'],
+            ['Класс2', 'Семейство2', 'Род2', 'Вид2', 'Сорт2']
+        ];
+
+        // Загружаем данные из localStorage с дефолтами
+        let circles = JSON.parse(localStorage.getItem('circles')) || defaultCircles;
+        let tableData = JSON.parse(localStorage.getItem('tableData')) || defaultTableData;
+        let newCircles = JSON.parse(localStorage.getItem('newCircles')) || []; // Теперь сохраняем новые круги
+        let backgroundImageSrc = localStorage.getItem('backgroundImageSrc') || 'my-image.jpg';
 
         const img = document.getElementById('backgroundImage');
+        img.src = backgroundImageSrc;
 
         img.onload = () => {
             renderCircles();
@@ -81,7 +98,7 @@
             // Удаляем старые круги
             document.querySelectorAll('.circle').forEach(c => c.remove());
             
-            // Создаём круги
+            // Создаём существующие круги (оранжевые)
             circles.forEach(circle => {
                 const circleEl = document.createElement('div');
                 circleEl.className = 'circle existing';
@@ -97,7 +114,7 @@
                 circleEl.addEventListener('dragend', handleDragEnd);
             });
             
-            // Новые круги (красные)
+            // Создаём новые круги (красные)
             newCircles.forEach(circle => {
                 const circleEl = document.createElement('div');
                 circleEl.className = 'circle new';
@@ -143,10 +160,12 @@
                 const index = newCircles.findIndex(c => c.id === id);
                 newCircles[index].x = newX;
                 newCircles[index].y = newY;
+                localStorage.setItem('newCircles', JSON.stringify(newCircles)); // Сохраняем изменения
             } else {
                 const index = circles.findIndex(c => c.id === id);
                 circles[index].x = newX;
                 circles[index].y = newY;
+                localStorage.setItem('circles', JSON.stringify(circles)); // Сохраняем изменения
             }
             
             draggedCircle = null;
@@ -154,7 +173,7 @@
 
         // Добавление нового круга
         document.getElementById('addCircle').addEventListener('click', () => {
-            // Генерируем новый ID (например, Круг1, Круг2 и т.д.)
+            // Генерируем новый ID
             const existingIds = circles.concat(newCircles).map(c => parseInt(c.id.replace('Круг', '')));
             const newIdNum = existingIds.length ? Math.max(...existingIds) + 1 : 1;
             const newId = `Круг${newIdNum}`;
@@ -168,7 +187,27 @@
             
             const newCircle = { id: newId, x: newX, y: newY };
             newCircles.push(newCircle);
+            localStorage.setItem('newCircles', JSON.stringify(newCircles)); // Сохраняем новые
             renderCircles();
+        });
+
+        // Загрузка изображения
+        document.getElementById('loadImage').addEventListener('click', () => {
+            document.getElementById('imageFile').click();
+        });
+
+        document.getElementById('imageFile').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                backgroundImageSrc = event.target.result;
+                img.src = backgroundImageSrc;
+                localStorage.setItem('backgroundImageSrc', backgroundImageSrc);
+                alert('Изображение загружено и сохранено!');
+            };
+            reader.readAsDataURL(file);
         });
 
         // Загрузка CSV
@@ -183,11 +222,11 @@
             const reader = new FileReader();
             reader.onload = (event) => {
                 const csvText = event.target.result;
-                // Парсим CSV (простой парсер, предполагаем разделитель запятой)
+                // Парсим CSV (разделитель запятой)
                 const rows = csvText.split('\n').map(row => row.split(','));
                 // Убираем заголовок, если есть
                 if (rows[0][0].toLowerCase().includes('класс')) rows.shift();
-                tableData = rows.filter(row => row.length > 1); // Убираем пустые строки
+                tableData = rows.filter(row => row.length > 1); // Убираем пустые
                 localStorage.setItem('tableData', JSON.stringify(tableData));
                 alert('CSV загружен и сохранён!');
             };
@@ -200,6 +239,7 @@
             circles = circles.concat(newCircles);
             newCircles = []; // Очищаем новые
             localStorage.setItem('circles', JSON.stringify(circles));
+            localStorage.setItem('newCircles', JSON.stringify(newCircles)); // Сохраняем пустые
             renderCircles();
             alert('Круги сохранены!');
         });

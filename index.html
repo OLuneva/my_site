@@ -49,15 +49,8 @@
             height: 20px;
             border-radius: 50%;
             cursor: pointer;
+            background-color: green; /* Все круги зелёные */
             z-index: 10;
-        }
-
-        .old-circle {
-            background-color: orange;
-        }
-
-        .new-circle {
-            background-color: red;
         }
 
         .blink {
@@ -65,7 +58,7 @@
         }
 
         @keyframes blink-yellow {
-            0%, 50% { background-color: currentColor; }
+            0%, 50% { background-color: green; }
             25%, 75% { background-color: yellow; }
         }
     </style>
@@ -88,19 +81,27 @@
         const select = document.getElementById('circle-select');
         const container = document.getElementById('container');
 
-        function createCircle(id, top = '50%', left = '50%', isOld = false) {
+        function createCircle(id, top = '50%', left = '50%') {
             const circle = document.createElement('div');
             circle.id = id;
             circle.className = 'circle';
-            if (isOld) {
-                circle.classList.add('old-circle');
-            } else {
-                circle.classList.add('new-circle');
-            }
             circle.style.top = top;
             circle.style.left = left;
             container.appendChild(circle);
             return circle;
+        }
+
+        function saveDefaultCircles() {
+            const circles = document.querySelectorAll('.circle');
+            const circleIds = [];
+            circles.forEach(circle => {
+                const id = circle.id;
+                circleIds.push(id);
+                const top = circle.style.top || '50%';
+                const left = circle.style.left || '50%';
+                localStorage.setItem(id, JSON.stringify({ top, left }));
+            });
+            localStorage.setItem('circles', JSON.stringify(circleIds));
         }
 
         function loadCircles() {
@@ -113,13 +114,14 @@
                     if (savedPos) {
                         ({ top, left } = JSON.parse(savedPos));
                     }
-                    createCircle(id, top, left, true);
+                    createCircle(id, top, left);
                 });
             } else {
                 // Дефолтные круги, если ничего не сохранено
-                createCircle('circle1', '10%', '10%', true);
-                createCircle('circle2', '50%', '50%', true);
-                createCircle('circle3', '80%', '80%', true);
+                createCircle('circle1', '10%', '10%');
+                createCircle('circle2', '50%', '50%');
+                createCircle('circle3', '80%', '80%');
+                saveDefaultCircles(); // Сохраняем дефолтные в localStorage
             }
             updateSelect();
         }

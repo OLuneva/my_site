@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -43,7 +44,7 @@
             cursor: pointer;
         }
 
-        /* Кнопка сохранения и добавления (видима только в режиме разработчика) */
+        /* Кнопка сохранения и добавления (скрыты по умолчанию, показываются в режиме разработчика) */
         #save-button, #add-circle-button {
             display: none;
         }
@@ -121,7 +122,7 @@
         const saveBtn = document.getElementById('save-button');
         const addCircleBtn = document.getElementById('add-circle-button');
 
-        let isDeveloperMode = false; // Флаг режима
+        let isDeveloperMode = false; // Флаг режима (по умолчанию пользователь)
         let draggedCircle = null; // Текущий перетаскиваемый круг
         let offsetX, offsetY; // Смещение мыши от центра круга
         let circleCounter = 1; // Счётчик для ID новых кругов

@@ -32,9 +32,25 @@
             padding: 5px;
         }
 
+        /* Кнопки для режимов */
+        #mode-buttons {
+            margin-top: 10px;
+        }
+
+        button {
+            padding: 5px 10px;
+            margin-right: 10px;
+            cursor: pointer;
+        }
+
+        /* Кнопка сохранения (видима только в режиме разработчика) */
+        #save-button {
+            display: none;
+        }
+
         /* Контейнер для картинки и кругов */
         #container {
-            margin-top: 60px; /* Отступ под фильтр */
+            margin-top: 100px; /* Отступ под фильтр и кнопки */
             position: relative;
             display: inline-block; /* Чтобы контейнер обёртывал картинку */
         }
@@ -56,6 +72,11 @@
             z-index: 10;
         }
 
+        /* В режиме разработчика курсор меняется для drag */
+        .circle.developer {
+            cursor: move;
+        }
+
         /* Анимация мигания жёлтым */
         .blink {
             animation: blink-yellow 1s infinite;
@@ -68,7 +89,7 @@
     </style>
 </head>
 <body>
-    <!-- Фильтр для выбора круга -->
+    <!-- Фильтр для выбора круга (виден только в режиме пользователя) -->
     <div id="filter">
         <label for="circle-select">Выберите круг:</label>
         <select id="circle-select">
@@ -77,16 +98,21 @@
             <option value="circle2">Круг 2</option>
             <option value="circle3">Круг 3</option>
         </select>
+
+        <!-- Кнопки для переключения режимов -->
+        <div id="mode-buttons">
+            <button id="user-mode">Режим пользователя</button>
+            <button id="developer-mode">Режим разработчика</button>
+            <button id="save-button">Сохранить позиции</button>
+        </div>
     </div>
 
     <!-- Контейнер с картинкой и кругами -->
     <div id="container">
         <!-- Картинка (замени 'my-image.jpg' на своё изображение) -->
-        <img id="image" src="План.jpg" alt="Картинка">
+        <img id="image" src="my-image.jpg" alt="Картинка">
 
-        <!-- Круги в определённых местах (позиции заданы относительно картинки) -->
-        <!-- Пример: круг 1 в верхнем левом углу, круг 2 в центре, круг 3 внизу справа -->
-        <!-- Настрой позиции под свою картинку -->
+        <!-- Круги в определённых местах (позиции будут загружаться из localStorage) -->
         <div id="circle1" class="circle" style="top: 10%; left: 10%;"></div>
         <div id="circle2" class="circle" style="top: 50%; left: 50%;"></div>
         <div id="circle3" class="circle" style="top: 80%; left: 80%;"></div>
@@ -96,26 +122,118 @@
         // Получаем элементы
         const select = document.getElementById('circle-select');
         const circles = document.querySelectorAll('.circle');
+        const userModeBtn = document.getElementById('user-mode');
+        const developerModeBtn = document.getElementById('developer-mode');
+        const saveBtn = document.getElementById('save-button');
+        const container = document.getElementById('container');
+        const image = document.getElementById('image');
+
+        let isDeveloperMode = false; // Флаг режима
+        let draggedCircle = null; // Текущий перетаскиваемый круг
+        let offsetX, offsetY; // Смещение мыши от центра круга
+
+        // Функция для загрузки позиций из localStorage
+        function loadPositions() {
+            circles.forEach(circle => {
+                const id = circle.id;
+                const savedPos = localStorage.getItem(id);
+                if (savedPos) {
+                    const { top, left } = JSON.parse(savedPos);
+                    circle.style.top = top;
+                    circle.style.left = left;
+                }
+            });
+        }
+
+        // Функция для сохранения позиций в localStorage
+        function savePositions() {
+            circles.forEach(circle => {
+                const id = circle.id;
+                const rect = circle.getBoundingClientRect();
+                const containerRect = container.getBoundingClientRect();
+                const top = ((rect.top - containerRect.top) / containerRect.height * 100) + '%';
+                const left = ((rect.left - containerRect.left) / containerRect.width * 100) + '%';
+                localStorage.setItem(id, JSON.stringify({ top, left }));
+            });
+            alert('Позиции сохранены!');
+        }
 
         // Функция для сброса мигания всех кругов
         function resetBlinks() {
             circles.forEach(circle => circle.classList.remove('blink'));
         }
 
-        // Обработчик изменения выбора в фильтре
+        // Обработчик изменения выбора в фильтре (только в режиме пользователя)
         select.addEventListener('change', (event) => {
-            resetBlinks(); // Сбрасываем все мигания
-            const selectedValue = event.target.value;
-            if (selectedValue) {
-                const selectedCircle = document.getElementById(selectedValue);
-                if (selectedCircle) {
-                    selectedCircle.classList.add('blink'); // Добавляем анимацию мигания
+            if (!isDeveloperMode) {
+                resetBlinks();
+                const selectedValue = event.target.value;
+                if (selectedValue) {
+                    const selectedCircle = document.getElementById(selectedValue);
+                    if (selectedCircle) {
+                        selectedCircle.classList.add('blink');
+                    }
                 }
             }
         });
+
+        // Переключение в режим пользователя
+        userModeBtn.addEventListener('click', () => {
+            isDeveloperMode = false;
+            select.style.display = 'inline';
+            saveBtn.style.display = 'none';
+            circles.forEach(circle => {
+                circle.classList.remove('developer');
+                circle.style.cursor = 'pointer';
+            });
+            resetBlinks(); // Сбрасываем мигания при переключении
+        });
+
+        // Переключение в режим разработчика
+        developerModeBtn.addEventListener('click', () => {
+            isDeveloperMode = true;
+            select.style.display = 'none';
+            saveBtn.style.display = 'inline';
+            circles.forEach(circle => {
+                circle.classList.add('developer');
+                circle.classList.remove('blink'); // Убираем мигания в режиме разработчика
+            });
+        });
+
+        // Сохранение позиций
+        saveBtn.addEventListener('click', savePositions);
+
+        // Drag-and-drop для кругов в режиме разработчика
+        circles.forEach(circle => {
+            circle.addEventListener('mousedown', (e) => {
+                if (isDeveloperMode) {
+                    draggedCircle = circle;
+                    const rect = circle.getBoundingClientRect();
+                    offsetX = e.clientX - rect.left - rect.width / 2;
+                    offsetY = e.clientY - rect.top - rect.height / 2;
+                }
+            });
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (draggedCircle && isDeveloperMode) {
+                const containerRect = container.getBoundingClientRect();
+                const newLeft = e.clientX - containerRect.left - offsetX;
+                const newTop = e.clientY - containerRect.top - offsetY;
+                // Ограничиваем движение в пределах контейнера
+                const maxLeft = containerRect.width - draggedCircle.offsetWidth;
+                const maxTop = containerRect.height - draggedCircle.offsetHeight;
+                draggedCircle.style.left = Math.max(0, Math.min(newLeft, maxLeft)) + 'px';
+                draggedCircle.style.top = Math.max(0, Math.min(newTop, maxTop)) + 'px';
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            draggedCircle = null;
+        });
+
+        // Инициализация: загружаем позиции при загрузке страницы
+        loadPositions();
     </script>
 </body>
 </html>
-
-
-

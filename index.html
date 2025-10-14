@@ -1,119 +1,157 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Фильтры из CSV</title>
+    <title>Режим пользователя</title>
     <style>
         body {
+            margin: 0;
+            padding: 0;
             font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
         }
-        .filters {
-            margin-bottom: 20px;
+
+        #filter {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background-color: white;
+            padding: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            z-index: 20;
         }
-        .filter {
-            margin-right: 15px;
+
+        #filter label {
+            margin-right: 10px;
+        }
+
+        #filter select {
+            padding: 5px;
+        }
+
+        #container {
+            margin-top: 100px;
+            position: relative;
+            display: inline-block;
+        }
+
+        #image {
+            display: block;
+            max-width: 100%;
+            height: auto;
+        }
+
+        .circle {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            cursor: pointer;
+            background-color: green; /* Все круги зелёные */
+            z-index: 10;
+        }
+
+        .blink {
+            animation: blink-yellow 1s infinite;
+        }
+
+        @keyframes blink-yellow {
+            0%, 50% { background-color: green; }
+            25%, 75% { background-color: yellow; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <button id="loadButton">Загрузить данные</button>
-        
-        <div class="filters">
-            <div class="filter">
-                <label>Класс:</label>
-                <select id="classFilter"></select>
-            </div>
-            <div class="filter">
-                <label>Семейство:</label>
-                <select id="familyFilter"></select>
-            </div>
-            <div class="filter">
-                <label>Род:</label>
-                <select id="genusFilter"></select>
-            </div>
-            <div class="filter">
-                <label>Вид:</label>
-                <select id="speciesFilter"></select>
-            </div>
-            <div class="filter">
-                <label>Сорт:</label>
-                <select id="varietyFilter"></select>
-            </div>
-        </div>
+    <!-- Фильтр для выбора круга -->
+    <div id="filter">
+        <label for="circle-select">Выберите круг:</label>
+        <select id="circle-select">
+            <option value="">-- Выберите --</option>
+        </select>
+    </div>
+
+    <!-- Контейнер с картинкой и кругами -->
+    <div id="container">
+        <img id="image" src="my-image.jpg" alt="Картинка">
     </div>
 
     <script>
-        // URL вашего CSV файла на GitHub
-        const csvUrl = 'https://raw.githubusercontent.com/oluneva/my_site/main/Plants.csv';
-        let tableData = [];
+        const select = document.getElementById('circle-select');
+        const container = document.getElementById('container');
 
-        // Функция для загрузки CSV
-        async function loadCSV(url) {
-            try {
-                const response = await fetch(url);
-                if (!response.ok) {
-                    throw new Error('Ошибка загрузки файла');
-                }
-                const data = await response.text();
-                return parseCSV(data);
-            } catch (error) {
-                console.error('Ошибка при загрузке CSV:', error);
-                return [];
-            }
+        function createCircle(id, top = '50%', left = '50%') {
+            const circle = document.createElement('div');
+            circle.id = id;
+            circle.className = 'circle';
+            circle.style.top = top;
+            circle.style.left = left;
+            container.appendChild(circle);
+            return circle;
         }
 
-        // Парсер CSV
-        function parseCSV(data) {
-            return data.split('\n').map(row => {
-                return row.split(',').map(cell => cell.trim());
+        function saveDefaultCircles() {
+            const circles = document.querySelectorAll('.circle');
+            const circleIds = [];
+            circles.forEach(circle => {
+                const id = circle.id;
+                circleIds.push(id);
+                const top = circle.style.top || '50%';
+                const left = circle.style.left || '50%';
+                localStorage.setItem(id, JSON.stringify({ top, left }));
             });
+            localStorage.setItem('circles', JSON.stringify(circleIds));
         }
 
-        // Функция заполнения фильтров
-        function populateFilters() {
-            const filters = {
-                classFilter: 0,
-                familyFilter: 1,
-                genusFilter: 2,
-                speciesFilter: 3,
-                varietyFilter: 4
-            };
-
-            Object.keys(filters).forEach(filterId => {
-                const select = document.getElementById(filterId);
-                const columnIndex = filters[filterId];
-                
-                // Получаем уникальные значения
-                const uniqueValues = [...new Set(
-                    tableData.map(row => row[columnIndex])
-                            .filter(val => val && val.trim())
-                )];
-                
-                // Очищаем существующие опции
-                select.innerHTML = '<option value="">Все</option>';
-                
-                uniqueValues.forEach(value => {
-                    const option = document.createElement('option');
-                    option.value = value;
-                    option.textContent = value;
-                    select.appendChild(option);
+        function loadCircles() {
+            const savedCircles = localStorage.getItem('circles');
+            if (savedCircles) {
+                const circleIds = JSON.parse(savedCircles);
+                circleIds.forEach(id => {
+                    const savedPos = localStorage.getItem(id);
+                    let top = '50%', left = '50%';
+                    if (savedPos) {
+                        ({ top, left } = JSON.parse(savedPos));
+                    }
+                    createCircle(id, top, left);
                 });
+            } else {
+                // Дефолтные круги, если ничего не сохранено
+                createCircle('circle1', '10%', '10%');
+                createCircle('circle2', '50%', '50%');
+                createCircle('circle3', '80%', '80%');
+                saveDefaultCircles(); // Сохраняем дефолтные в localStorage
+            }
+            updateSelect();
+        }
+
+        function updateSelect() {
+            select.innerHTML = '<option value="">-- Выберите --</option>';
+            document.querySelectorAll('.circle').forEach(circle => {
+                const option = document.createElement('option');
+                option.value = circle.id;
+                option.textContent = circle.id.replace('circle', 'Круг ');
+                select.appendChild(option);
             });
         }
 
-        // Обработчик кнопки загрузки
-        document.getElementById('loadButton').addEventListener('click', async () => {
-            try {
-                tableData = await loadCSV(csvUrl);
-                populateFilters();
-                console.log('Данные загружены успешно');
-            } catch (error) {
-                console.error('Ошибка при загрузке данных:', error);
+        function resetBlinks() {
+            document.querySelectorAll('.circle').forEach(circle => circle.classList.remove('blink'));
+        }
+
+        select.addEventListener('change', (event) => {
+            resetBlinks();
+            const selectedValue = event.target.value;
+            if (selectedValue) {
+                const selectedCircle = document.getElementById(selectedValue);
+                if (selectedCircle) {
+                    selectedCircle.classList.add('blink');
+                }
             }
         });
+
+        loadCircles();
     </script>
 </body>
 </html>
-

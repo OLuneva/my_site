@@ -1,157 +1,139 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Режим пользователя</title>
+    <title>Пользовательский режим - Просмотр кругов</title>
     <style>
         body {
-            margin: 0;
-            padding: 0;
             font-family: Arial, sans-serif;
-            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
         }
-
-        #filter {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            background-color: white;
-            padding: 10px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            z-index: 20;
-        }
-
-        #filter label {
-            margin-right: 10px;
-        }
-
-        #filter select {
-            padding: 5px;
-        }
-
-        #container {
-            margin-top: 100px;
+        .container {
             position: relative;
-            display: inline-block;
+            max-width: 800px;
+            margin: 0 auto;
         }
-
-        #image {
-            display: block;
-            max-width: 100%;
+        #backgroundImage {
+            width: 100%;
             height: auto;
+            position: relative;
+            border: 1px solid #ccc;
         }
-
         .circle {
             position: absolute;
             width: 20px;
             height: 20px;
             border-radius: 50%;
+            background-color: red;
             cursor: pointer;
-            background-color: green; /* Все круги зелёные */
-            z-index: 10;
+            user-select: none;
+            transition: background-color 0.3s;
         }
-
-        .blink {
-            animation: blink-yellow 1s infinite;
+        .circle:hover {
+            background-color: green;
+            animation: blink 0.5s infinite alternate;
         }
-
-        @keyframes blink-yellow {
-            0%, 50% { background-color: green; }
-            25%, 75% { background-color: yellow; }
+        @keyframes blink {
+            0% { opacity: 1; }
+            100% { opacity: 0.5; }
+        }
+        .nav, .filters {
+            margin-bottom: 20px;
+        }
+        select {
+            margin-right: 10px;
         }
     </style>
 </head>
 <body>
-    <!-- Фильтр для выбора круга -->
-    <div id="filter">
-        <label for="circle-select">Выберите круг:</label>
-        <select id="circle-select">
-            <option value="">-- Выберите --</option>
-        </select>
-    </div>
-
-    <!-- Контейнер с картинкой и кругами -->
-    <div id="container">
-        <img id="image" src="my-image.jpg" alt="Картинка">
+    <div class="container">
+        <div class="nav">
+            <button onclick="window.location.href='developer.html'">Перейти в режим разработчика</button>
+        </div>
+        
+        <div class="filters">
+            <label>Класс: <select id="classFilter"><option value="">Все</option></select></label>
+            <label>Семейство: <select id="familyFilter"><option value="">Все</option></select></label>
+            <label>Род: <select id="genusFilter"><option value="">Все</option></select></label>
+            <label>Вид: <select id="speciesFilter"><option value="">Все</option></select></label>
+            <label>Сорт: <select id="varietyFilter"><option value="">Все</option></select></label>
+        </div>
+        
+        <img id="backgroundImage" src="my-image.jpg" alt="Фон с растениями">
     </div>
 
     <script>
-        const select = document.getElementById('circle-select');
-        const container = document.getElementById('container');
+        // Дефолтные данные для тестирования
+        const defaultCircles = [
+            { id: 'Круг1', x: 10, y: 10 },
+            { id: 'Круг2', x: 20, y: 20 }
+        ];
+        const defaultTableData = [
+            ['Класс1', 'Семейство1', 'Род1', 'Вид1', 'Сорт1'],
+            ['Класс2', 'Семейство2', 'Род2', 'Вид2', 'Сорт2']
+        ];
 
-        function createCircle(id, top = '50%', left = '50%') {
-            const circle = document.createElement('div');
-            circle.id = id;
-            circle.className = 'circle';
-            circle.style.top = top;
-            circle.style.left = left;
-            container.appendChild(circle);
-            return circle;
-        }
+        // Загружаем данные из localStorage с дефолтами
+        let circles = JSON.parse(localStorage.getItem('circles')) || defaultCircles;
+        let tableData = JSON.parse(localStorage.getItem('tableData')) || defaultTableData;
+        let backgroundImageSrc = localStorage.getItem('backgroundImageSrc') || 'my-image.jpg';
 
-        function saveDefaultCircles() {
-            const circles = document.querySelectorAll('.circle');
-            const circleIds = [];
+        const img = document.getElementById('backgroundImage');
+        img.src = backgroundImageSrc;
+
+        img.onload = () => {
+            renderCircles();
+            populateFilters();
+        };
+
+        // Функция для рендеринга кругов
+        function renderCircles() {
+            // Удаляем старые круги
+            document.querySelectorAll('.circle').forEach(c => c.remove());
+            
+            // Создаём круги
             circles.forEach(circle => {
-                const id = circle.id;
-                circleIds.push(id);
-                const top = circle.style.top || '50%';
-                const left = circle.style.left || '50%';
-                localStorage.setItem(id, JSON.stringify({ top, left }));
+                const circleEl = document.createElement('div');
+                circleEl.className = 'circle';
+                circleEl.id = circle.id;
+                circleEl.style.left = `${circle.x}%`;
+                circleEl.style.top = `${circle.y}%`;
+                circleEl.title = `Круг: ${circle.id}`;
+                img.appendChild(circleEl);
             });
-            localStorage.setItem('circles', JSON.stringify(circleIds));
         }
 
-        function loadCircles() {
-            const savedCircles = localStorage.getItem('circles');
-            if (savedCircles) {
-                const circleIds = JSON.parse(savedCircles);
-                circleIds.forEach(id => {
-                    const savedPos = localStorage.getItem(id);
-                    let top = '50%', left = '50%';
-                    if (savedPos) {
-                        ({ top, left } = JSON.parse(savedPos));
-                    }
-                    createCircle(id, top, left);
+        // Заполнение фильтров уникальными значениями из tableData
+        function populateFilters() {
+            const filters = {
+                classFilter: 0, // Индекс колонки Класс
+                familyFilter: 1, // Семейство
+                genusFilter: 2, // Род
+                speciesFilter: 3, // Вид
+                varietyFilter: 4 // Сорт
+            };
+
+            Object.keys(filters).forEach(filterId => {
+                const select = document.getElementById(filterId);
+                const columnIndex = filters[filterId];
+                const uniqueValues = [...new Set(tableData.map(row => row[columnIndex]).filter(val => val && val.trim()))]; // Фильтруем пустые и пробелы
+                uniqueValues.forEach(value => {
+                    const option = document.createElement('option');
+                    option.value = value;
+                    option.textContent = value;
+                    select.appendChild(option);
                 });
-            } else {
-                // Дефолтные круги, если ничего не сохранено
-                createCircle('circle1', '10%', '10%');
-                createCircle('circle2', '50%', '50%');
-                createCircle('circle3', '80%', '80%');
-                saveDefaultCircles(); // Сохраняем дефолтные в localStorage
-            }
-            updateSelect();
-        }
-
-        function updateSelect() {
-            select.innerHTML = '<option value="">-- Выберите --</option>';
-            document.querySelectorAll('.circle').forEach(circle => {
-                const option = document.createElement('option');
-                option.value = circle.id;
-                option.textContent = circle.id.replace('circle', 'Круг ');
-                select.appendChild(option);
             });
         }
 
-        function resetBlinks() {
-            document.querySelectorAll('.circle').forEach(circle => circle.classList.remove('blink'));
+        // Инициализация
+        if (img.complete) {
+            renderCircles();
+            populateFilters();
         }
-
-        select.addEventListener('change', (event) => {
-            resetBlinks();
-            const selectedValue = event.target.value;
-            if (selectedValue) {
-                const selectedCircle = document.getElementById(selectedValue);
-                if (selectedCircle) {
-                    selectedCircle.classList.add('blink');
-                }
-            }
-        });
-
-        loadCircles();
     </script>
 </body>
 </html>

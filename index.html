@@ -66,57 +66,54 @@
     </div>
 
     <script>
-        // Дефолтные данные для тестирования
+        // Дефолтные данные для тестирования (теперь как массив объектов для consistency с CSV)
         const defaultCircles = [
             { id: 'Круг1', x: 10, y: 10 },
             { id: 'Круг2', x: 20, y: 20 }
         ];
         const defaultTableData = [
-            ['Класс1', 'Семейство1', 'Род1', 'Вид1', 'Сорт1'],
-            ['Класс2', 'Семейство2', 'Род2', 'Вид2', 'Сорт2']
+            { class: 'Класс1', family: 'Семейство1', genus: 'Род1', species: 'Вид1', variety: 'Сорт1' },
+            { class: 'Класс2', family: 'Семейство2', genus: 'Род2', species: 'Вид2', variety: 'Сорт2' }
         ];
-// добавлено
-       // Функция для загрузки и парсинга CSV с разделителями ; и кодировкой Windows-1251
-async function loadCSV() {
-    try {
-        const response = await fetch('https://raw.githubusercontent.com/твой_пользователь/твой_репозиторий/main/Plants.csv'); // Замени на свой URL
-        if (!response.ok) throw new Error('Не удалось загрузить CSV');
-        const buffer = await response.arrayBuffer();
-        const decoder = new TextDecoder('windows-1251');
-        const csvText = decoder.decode(buffer);
-        const lines = csvText.split('\n').filter(line => line.trim());
-        const data = [];
-        for (let i = 1; i < lines.length; i++) { // Пропускаем заголовок
-            const cols = lines[i].split(';');
-            if (cols.length >= 6) { // Предполагаем 6 столбцов
-                data.push({
-                    class: cols[0].trim(),
-                    subclass: cols[1].trim(),
-                    col3: cols[2].trim(),
-                    col4: cols[3].trim(),
-                    col5: cols[4].trim(),
-                    col6: cols[5].trim()
-                });
+
+        // Функция для загрузки и парсинга CSV с разделителями ; и кодировкой Windows-1251
+        async function loadCSV() {
+            try {
+                const response = await fetch('https://raw.githubusercontent.com/твой_пользователь/твой_репозиторий/main/Plants.csv'); // Замени на свой реальный URL на GitHub
+                if (!response.ok) throw new Error('Не удалось загрузить CSV');
+                const buffer = await response.arrayBuffer();
+                const decoder = new TextDecoder('windows-1251');
+                const csvText = decoder.decode(buffer);
+                const lines = csvText.split('\n').filter(line => line.trim());
+                const data = [];
+                for (let i = 1; i < lines.length; i++) { // Пропускаем заголовок
+                    const cols = lines[i].split(';');
+                    if (cols.length >= 5) { // Ожидаем минимум 5 столбцов (class, family, genus, species, variety)
+                        data.push({
+                            class: cols[0].trim(),
+                            family: cols[1].trim(), // Предполагаем, что cols[1] - family (если subclass, переименуйте)
+                            genus: cols[2].trim(),
+                            species: cols[3].trim(),
+                            variety: cols[4].trim()
+                        });
+                    }
+                }
+                return data;
+            } catch (error) {
+                console.error('Ошибка загрузки CSV:', error);
+                return null;
             }
         }
-        return data;
-    } catch (error) {
-        console.error('Ошибка загрузки CSV:', error);
-        return null;
-    }
-}
-// Загружаем CSV и устанавливаем tableData
-loadCSV().then(loadedData => {
-    tableData = loadedData || defaultTableData; // Если загрузка успешна, используем loadedData, иначе дефолт
-    populateFilters(); // Заполняем фильтры после загрузки
-});
-         
 
-// конец добавки
-        
+        // Загружаем CSV и устанавливаем tableData
+        let tableData = [];
+        loadCSV().then(loadedData => {
+            tableData = loadedData || defaultTableData; // Если загрузка успешна, используем loadedData, иначе дефолт
+            populateFilters(); // Заполняем фильтры после загрузки
+        });
+
         // Загружаем данные из localStorage с дефолтами
         let circles = JSON.parse(localStorage.getItem('circles')) || defaultCircles;
-        let tableData = JSON.parse(localStorage.getItem('tableData')) || defaultTableData;
         let backgroundImageSrc = localStorage.getItem('backgroundImageSrc') || 'my-image.jpg';
 
         const img = document.getElementById('backgroundImage');
@@ -124,7 +121,7 @@ loadCSV().then(loadedData => {
 
         img.onload = () => {
             renderCircles();
-            populateFilters();
+            // populateFilters() уже вызвана в loadCSV().then()
         };
 
         // Функция для рендеринга кругов
@@ -144,83 +141,82 @@ loadCSV().then(loadedData => {
             });
         }
 
-        // Заполнение фильтров уникальными значениями из tableData
-        // заменяем
+        // Заполнение фильтров уникальными значениями из tableData (адаптировано для объектов и 5 фильтров)
         function populateFilters(selectedValues = []) {
-    // Убедимся, что selectedValues имеет длину равную количеству фильтров (6)
-    while (selectedValues.length < 6) {
-        selectedValues.push('Все');
-    }
-
-    // Получаем все select элементы
-    const filters = [
-        document.getElementById('filter1'),
-        document.getElementById('filter2'),
-        document.getElementById('filter3'),
-        document.getElementById('filter4'),
-        document.getElementById('filter5'),
-        document.getElementById('filter6')
-    ];
-
-    // Функция для получения уникальных значений из данных, отфильтрованных по предыдущим выборам
-    function getFilteredOptions(index, prevSelections) {
-        let filtered = tableData.slice(); // Копируем данные
-
-        // Применяем фильтры по предыдущим выборам
-        for (let i = 0; i < index; i++) {
-            if (prevSelections[i] !== 'Все') {
-                filtered = filtered.filter(row => row[i] === prevSelections[i]);
+            // Убедимся, что selectedValues имеет длину равную количеству фильтров (5)
+            while (selectedValues.length < 5) {
+                selectedValues.push('Все');
             }
-        }
 
-        // Собираем уникальные значения для текущего фильтра
-        const options = new Set();
-        filtered.forEach(row => options.add(row[index]));
-        return Array.from(options).sort();
-    }
+            // Получаем все select элементы (используем правильные ID из HTML)
+            const filters = [
+                document.getElementById('classFilter'),
+                document.getElementById('familyFilter'),
+                document.getElementById('genusFilter'),
+                document.getElementById('speciesFilter'),
+                document.getElementById('varietyFilter')
+            ];
 
-    // Функция для обновления зависимых фильтров
-    function updateDependentFilters(startIndex) {
-        for (let i = startIndex; i < filters.length; i++) {
-            const options = getFilteredOptions(i, selectedValues);
-            filters[i].innerHTML = '<option value="Все">Все</option>';
-            options.forEach(option => {
-                const optElement = document.createElement('option');
-                optElement.value = option;
-                optElement.textContent = option;
-                filters[i].appendChild(optElement);
+            // Ключи для фильтров (соответствуют структуре объектов в tableData)
+            const keys = ['class', 'family', 'genus', 'species', 'variety'];
+
+            // Функция для получения уникальных значений из данных, отфильтрованных по предыдущим выборам
+            function getFilteredOptions(index, prevSelections) {
+                let filtered = tableData.slice(); // Копируем данные
+
+                // Применяем фильтры по предыдущим выборам
+                for (let i = 0; i < index; i++) {
+                    if (prevSelections[i] !== 'Все') {
+                        filtered = filtered.filter(row => row[keys[i]] === prevSelections[i]);
+                    }
+                }
+
+                // Собираем уникальные значения для текущего фильтра
+                const options = new Set();
+                filtered.forEach(row => options.add(row[keys[index]]));
+                return Array.from(options).sort();
+            }
+
+            // Функция для обновления зависимых фильтров
+            function updateDependentFilters(startIndex) {
+                for (let i = startIndex; i < filters.length; i++) {
+                    const options = getFilteredOptions(i, selectedValues);
+                    filters[i].innerHTML = '<option value="Все">Все</option>';
+                    options.forEach(option => {
+                        const optElement = document.createElement('option');
+                        optElement.value = option;
+                        optElement.textContent = option;
+                        filters[i].appendChild(optElement);
+                    });
+                    // Устанавливаем выбранное значение, если оно есть
+                    if (selectedValues[i] && selectedValues[i] !== 'Все') {
+                        filters[i].value = selectedValues[i];
+                    } else {
+                        selectedValues[i] = 'Все';
+                    }
+                }
+                // После обновления фильтров, перерисовываем круги (фильтры пока не влияют на круги напрямую, но можно добавить логику)
+                renderCircles();
+            }
+
+            // Обработчики изменений для каждого фильтра (каскадное обновление)
+            filters.forEach((filter, index) => {
+                filter.addEventListener('change', () => {
+                    selectedValues[index] = filter.value;
+                    updateDependentFilters(index + 1); // Обновляем последующие фильтры
+                });
             });
-            // Устанавливаем выбранное значение, если оно есть
-            if (selectedValues[i] && selectedValues[i] !== 'Все') {
-                filters[i].value = selectedValues[i];
-            } else {
-                selectedValues[i] = 'Все';
-            }
+
+            // Инициализируем фильтры с опциями
+            updateDependentFilters(0);
         }
-        // После обновления фильтров, перерисовываем таблицу и круги
-        renderTable();
-        renderCircles();
-    }
 
-    // Инициализируем фильтры с опциями
-    updateDependentFilters(0);
-
-        //замена конец
-        // Инициализация
+        // Инициализация (если изображение уже загружено)
         if (img.complete) {
             renderCircles();
-            populateFilters();
+            // populateFilters() уже вызвана в loadCSV().then()
         }
     </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
 

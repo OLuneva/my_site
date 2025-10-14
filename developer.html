@@ -17,6 +17,7 @@
         button { background-color: #4CAF50; color: white; border: none; padding: 10px 20px; cursor: pointer; margin-left: 10px; }
         button:hover { background-color: #45a049; }
         #deleteSelect { margin-left: 10px; }
+        input[type="file"] { margin-left: 10px; }
     </style>
 </head>
 <body>
@@ -35,6 +36,9 @@
         <button id="deleteButton">Удалить круг</button>
         <select id="deleteSelect"><option value="">Выберите круг для удаления</option></select>
         <button id="exportButton">Экспорт координат кругов</button>
+        <!-- Новая кнопка импорта -->
+        <input type="file" id="importFile" accept=".json" style="display: none;">
+        <button id="importButton">Импорт кругов из файла</button>
     </div>
     <div id="imageContainer">
         <img id="image" src="my-image.jpg" alt="Изображение" onload="init()">
@@ -97,23 +101,22 @@
 
         // Выбор круга (для выделения и удаления)
         function selectCircle(e) {
-            e.stopPropagation(); // Предотвращаем добавление нового круга
+            e.stopPropagation(); // Предотвращаем bubbling
             selectedCircle = e.target;
             document.querySelectorAll('.circle').forEach(c => c.classList.remove('selected'));
             selectedCircle.classList.add('selected');
         }
 
-        // Добавление круга по клику на изображение (считаем "старым", оранжевым) - ID запрашивается
+        // Добавление круга по клику на изображение (автоматический ID, цвет orange)
         document.getElementById('imageContainer').addEventListener('click', function(e) {
             if (e.target.id !== 'image') return; // Не добавлять, если клик на круге
             const rect = e.target.getBoundingClientRect();
             const x = ((e.clientX - rect.left) / rect.width) * 100;
             const y = ((e.clientY - rect.top) / rect.height) * 100;
-            const id = prompt('Введите имя круга:');
-            if (id) {
-                circles.push({ id, x, y, color: 'orange' });
-                renderCircles();
-            }
+            // Автоматическая генерация ID: "circle_" + (circles.length + 1)
+            const newId = "circle_" + (circles.length + 1);
+            circles.push({ id: newId, x, y, color: 'orange' });
+            renderCircles();
         });
 
         // Drag-and-drop (без изменений)
@@ -166,7 +169,7 @@
 
         // Обработчики кнопок
         document.getElementById('addButton').addEventListener('click', function() {
-            // Автоматическая генерация ID: "circle_" + (количество существующих + 1)
+            // Автоматическая генерация ID: "circle_" + (circles.length + 1)
             const newId = "circle_" + (circles.length + 1);
             // Новый круг: красный, в центре или сдвинутый вправо
             const x = lastNewX;
@@ -177,7 +180,12 @@
         });
 
         document.getElementById('saveButton').addEventListener('click', function() {
+            // После сохранения все красные круги становятся оранжевыми (становятся "старыми")
+            circles.forEach(c => {
+                if (c.color === 'red') c.color = 'orange';
+            });
             localStorage.setItem('circles', JSON.stringify(circles));
+            renderCircles(); // Перерисовываем для применения цветов
             alert('Круги сохранены!');
         });
 
@@ -219,6 +227,48 @@
             linkElement.setAttribute('href', dataUri);
             linkElement.setAttribute('download', exportFileDefaultName);
             linkElement.click();
+        });
+
+        // Импорт кругов из файла
+        document.getElementById('importButton').addEventListener('click', function() {
+            document.getElementById('importFile').click();
+        });
+
+        document.getElementById('importFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    const importedCircles = JSON.parse(event.target.result);
+                    if (!Array.isArray(importedCircles)) {
+                        alert('Неверный формат файла. Ожидается массив кругов.');
+                        return;
+                    }
+                    // Размещаем круги по порядку сверху: y=5%, x равномерно от 5% до 95%
+                    const numCircles = importedCircles.length;
+                    if (numCircles === 0) {
+                        alert('Файл пустой.');
+                        return;
+                    }
+                    const startX = 5; // Начало x в процентах
+                    const endX = 95; // Конец x в процентах
+                    const y = 5; // Верхняя позиция y в процентах
+                    const stepX = (endX - startX) / (numCircles - 1); // Шаг, если больше 1 круга
+                    importedCircles.forEach((circle, index) => {
+                        circle.x = numCircles === 1 ? 50 : startX + index * stepX; // Если один, в центре
+                        circle.y = y;
+                        circle.color = circle.color || 'orange'; // Устанавливаем цвет, если не указан
+                    });
+                    circles = importedCircles; // Заменяем текущие круги импортированными
+                    localStorage.setItem('circles', JSON.stringify(circles));
+                    renderCircles();
+                    alert(`Импортировано ${numCircles} кругов и размещено сверху.`);
+                } catch (error) {
+                    alert('Ошибка чтения файла: ' + error.message);
+                }
+            };
+            reader.readAsText(file);
         });
     </script>
 </body>

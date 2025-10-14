@@ -145,28 +145,67 @@ loadCSV().then(loadedData => {
         }
 
         // Заполнение фильтров уникальными значениями из tableData
-        function populateFilters() {
-            const filters = {
-                classFilter: 0, // Индекс колонки Класс
-                familyFilter: 1, // Семейство
-                genusFilter: 2, // Род
-                speciesFilter: 3, // Вид
-                varietyFilter: 4 // Сорт
-            };
+        // заменяем
+        function populateFilters(selectedValues = []) {
+    // Убедимся, что selectedValues имеет длину равную количеству фильтров (6)
+    while (selectedValues.length < 6) {
+        selectedValues.push('Все');
+    }
 
-            Object.keys(filters).forEach(filterId => {
-                const select = document.getElementById(filterId);
-                const columnIndex = filters[filterId];
-                const uniqueValues = [...new Set(tableData.map(row => row[columnIndex]).filter(val => val && val.trim()))]; // Фильтруем пустые и пробелы
-                uniqueValues.forEach(value => {
-                    const option = document.createElement('option');
-                    option.value = value;
-                    option.textContent = value;
-                    select.appendChild(option);
-                });
-            });
+    // Получаем все select элементы
+    const filters = [
+        document.getElementById('filter1'),
+        document.getElementById('filter2'),
+        document.getElementById('filter3'),
+        document.getElementById('filter4'),
+        document.getElementById('filter5'),
+        document.getElementById('filter6')
+    ];
+
+    // Функция для получения уникальных значений из данных, отфильтрованных по предыдущим выборам
+    function getFilteredOptions(index, prevSelections) {
+        let filtered = tableData.slice(); // Копируем данные
+
+        // Применяем фильтры по предыдущим выборам
+        for (let i = 0; i < index; i++) {
+            if (prevSelections[i] !== 'Все') {
+                filtered = filtered.filter(row => row[i] === prevSelections[i]);
+            }
         }
 
+        // Собираем уникальные значения для текущего фильтра
+        const options = new Set();
+        filtered.forEach(row => options.add(row[index]));
+        return Array.from(options).sort();
+    }
+
+    // Функция для обновления зависимых фильтров
+    function updateDependentFilters(startIndex) {
+        for (let i = startIndex; i < filters.length; i++) {
+            const options = getFilteredOptions(i, selectedValues);
+            filters[i].innerHTML = '<option value="Все">Все</option>';
+            options.forEach(option => {
+                const optElement = document.createElement('option');
+                optElement.value = option;
+                optElement.textContent = option;
+                filters[i].appendChild(optElement);
+            });
+            // Устанавливаем выбранное значение, если оно есть
+            if (selectedValues[i] && selectedValues[i] !== 'Все') {
+                filters[i].value = selectedValues[i];
+            } else {
+                selectedValues[i] = 'Все';
+            }
+        }
+        // После обновления фильтров, перерисовываем таблицу и круги
+        renderTable();
+        renderCircles();
+    }
+
+    // Инициализируем фильтры с опциями
+    updateDependentFilters(0);
+
+        //замена конец
         // Инициализация
         if (img.complete) {
             renderCircles();
@@ -175,6 +214,7 @@ loadCSV().then(loadedData => {
     </script>
 </body>
 </html>
+
 
 
 

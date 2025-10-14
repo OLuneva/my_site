@@ -82,11 +82,10 @@ async function loadCSV() {
         const response = await fetch('https://raw.githubusercontent.com/oluneva/my_site/main/Plants.csv'); // Замени на свой URL
         if (!response.ok) throw new Error('Не удалось загрузить CSV');
         
-        // Явно указываем кодировку UTF-8 для корректного чтения русского текста
-        const csvText = await response.text(); // Fetch по умолчанию использует UTF-8
-        // Если файл в CP1251 (Windows), используй TextDecoder для конвертации (раскомментируй ниже, если UTF-8 не помогает):
-        сonst encoder = new TextDecoder('windows-1251');
-        const csvText = encoder.decode(new Uint8Array(await response.arrayBuffer()));
+        // Декодируем как Windows-1251 (для русских символов)
+        const buffer = await response.arrayBuffer();
+        const decoder = new TextDecoder('windows-1251');
+        const csvText = decoder.decode(buffer);
         
         // Парсим с разделителем ';'
         const rows = csvText.trim().split('\n').map(row => {
@@ -176,6 +175,7 @@ async function loadCSV() {
     </script>
 </body>
 </html>
+
 
 
 

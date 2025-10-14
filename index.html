@@ -85,8 +85,8 @@ async function loadCSV() {
         // Явно указываем кодировку UTF-8 для корректного чтения русского текста
         const csvText = await response.text(); // Fetch по умолчанию использует UTF-8
         // Если файл в CP1251 (Windows), используй TextDecoder для конвертации (раскомментируй ниже, если UTF-8 не помогает):
-        // const encoder = new TextDecoder('windows-1251');
-        // const csvText = encoder.decode(new Uint8Array(await response.arrayBuffer()));
+        сonst encoder = new TextDecoder('windows-1251');
+        const csvText = encoder.decode(new Uint8Array(await response.arrayBuffer()));
         
         // Парсим с разделителем ';'
         const rows = csvText.trim().split('\n').map(row => {
@@ -176,6 +176,7 @@ async function loadCSV() {
     </script>
 </body>
 </html>
+
 
 
 

@@ -3,18 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Пользовательский режим - Просмотр кругов</title>
+    <title>Фильтры из CSV</title>
     <style>
-        /* Стили остаются без изменений */
+        body {
+            font-family: Arial, sans-serif;
+        }
+        .filters {
+            margin-bottom: 20px;
+        }
+        .filter {
+            margin-right: 15px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- HTML структура остается без изменений -->
+        <button id="loadButton">Загрузить данные</button>
+        
+        <div class="filters">
+            <div class="filter">
+                <label>Класс:</label>
+                <select id="classFilter"></select>
+            </div>
+            <div class="filter">
+                <label>Семейство:</label>
+                <select id="familyFilter"></select>
+            </div>
+            <div class="filter">
+                <label>Род:</label>
+                <select id="genusFilter"></select>
+            </div>
+            <div class="filter">
+                <label>Вид:</label>
+                <select id="speciesFilter"></select>
+            </div>
+            <div class="filter">
+                <label>Сорт:</label>
+                <select id="varietyFilter"></select>
+            </div>
+        </div>
     </div>
 
     <script>
-        // Функция для чтения CSV файла
+        // URL вашего CSV файла на GitHub
+        const csvUrl = 'https://raw.githubusercontent.com/ваш-репозиторий/plants.csv';
+        let tableData = [];
+
+        // Функция для загрузки CSV
         async function loadCSV(url) {
             try {
                 const response = await fetch(url);
@@ -29,41 +64,14 @@
             }
         }
 
+        // Парсер CSV
         function parseCSV(data) {
             return data.split('\n').map(row => {
                 return row.split(',').map(cell => cell.trim());
             });
         }
 
-        // Загружаем данные из CSV файла
-        let tableData = [];
-        const csvUrl = 'https://raw.githubusercontent.com/ваш-репозиторий/plants.csv';
-
-        async function init() {
-            try {
-                tableData = await loadCSV(csvUrl);
-                await renderUI();
-            } catch (error) {
-                console.error('Ошибка инициализации:', error);
-            }
-        }
-
-        async function renderUI() {
-            const img = document.getElementById('backgroundImage');
-            img.src = localStorage.getItem('backgroundImageSrc') || 'my-image.jpg';
-            
-            img.onload = () => {
-                renderCircles();
-                populateFilters();
-            };
-        }
-
-        // Функция для рендеринга кругов (без изменений)
-        function renderCircles() {
-            // ... существующий код
-        }
-
-        // Обновленная функция заполнения фильтров
+        // Функция заполнения фильтров
         function populateFilters() {
             const filters = {
                 classFilter: 0,
@@ -77,10 +85,10 @@
                 const select = document.getElementById(filterId);
                 const columnIndex = filters[filterId];
                 
-                // Получаем уникальные значения из таблицы
+                // Получаем уникальные значения
                 const uniqueValues = [...new Set(
                     tableData.map(row => row[columnIndex])
-                        .filter(val => val && val.trim())
+                            .filter(val => val && val.trim())
                 )];
                 
                 // Очищаем существующие опции
@@ -95,8 +103,16 @@
             });
         }
 
-        // Запуск инициализации
-        init();
+        // Обработчик кнопки загрузки
+        document.getElementById('loadButton').addEventListener('click', async () => {
+            try {
+                tableData = await loadCSV(csvUrl);
+                populateFilters();
+                console.log('Данные загружены успешно');
+            } catch (error) {
+                console.error('Ошибка при загрузке данных:', error);
+            }
+        });
     </script>
 </body>
 </html>

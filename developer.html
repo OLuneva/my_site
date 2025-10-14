@@ -16,8 +16,6 @@
         select { margin-right: 10px; }
         button { background-color: #4CAF50; color: white; border: none; padding: 10px 20px; cursor: pointer; margin-left: 10px; }
         button:hover { background-color: #45a049; }
-        #addForm { display: none; margin-top: 10px; } /* Скрытая форма для добавления */
-        #addForm input { margin-right: 10px; width: 100px; }
         #deleteSelect { margin-left: 10px; }
     </style>
 </head>
@@ -37,12 +35,6 @@
         <button id="deleteButton">Удалить круг</button>
         <select id="deleteSelect"><option value="">Выберите круг для удаления</option></select>
         <button id="exportButton">Экспорт координат кругов</button>
-        <!-- Форма для добавления круга (показывается при клике на "Добавить круг") -->
-        <div id="addForm">
-            <label>ID: <input type="text" id="addId" placeholder="Имя круга"></label>
-            <button id="confirmAdd">Добавить</button>
-            <button id="cancelAdd">Отмена</button>
-        </div>
     </div>
     <div id="imageContainer">
         <img id="image" src="my-image.jpg" alt="Изображение" onload="init()">
@@ -111,7 +103,7 @@
             selectedCircle.classList.add('selected');
         }
 
-        // Добавление круга по клику на изображение (считаем "старым", оранжевым)
+        // Добавление круга по клику на изображение (считаем "старым", оранжевым) - ID запрашивается
         document.getElementById('imageContainer').addEventListener('click', function(e) {
             if (e.target.id !== 'image') return; // Не добавлять, если клик на круге
             const rect = e.target.getBoundingClientRect();
@@ -174,28 +166,14 @@
 
         // Обработчики кнопок
         document.getElementById('addButton').addEventListener('click', function() {
-            document.getElementById('addForm').style.display = 'block';
-        });
-
-        document.getElementById('confirmAdd').addEventListener('click', function() {
-            const id = document.getElementById('addId').value;
-            if (id) {
-                // Новый круг: красный, в центре или сдвинутый вправо
-                const x = lastNewX;
-                const y = 50; // Центр по Y
-                lastNewX += 10; // Сдвиг вправо на 10% при следующем добавлении
-                circles.push({ id, x, y, color: 'red' });
-                renderCircles();
-                document.getElementById('addForm').style.display = 'none';
-                // Очистка поля
-                document.getElementById('addId').value = '';
-            } else {
-                alert('Введите имя круга.');
-            }
-        });
-
-        document.getElementById('cancelAdd').addEventListener('click', function() {
-            document.getElementById('addForm').style.display = 'none';
+            // Автоматическая генерация ID: "circle_" + (количество существующих + 1)
+            const newId = "circle_" + (circles.length + 1);
+            // Новый круг: красный, в центре или сдвинутый вправо
+            const x = lastNewX;
+            const y = 50; // Центр по Y
+            lastNewX += 10; // Сдвиг вправо на 10% при следующем добавлении
+            circles.push({ id: newId, x, y, color: 'red' });
+            renderCircles();
         });
 
         document.getElementById('saveButton').addEventListener('click', function() {
@@ -207,6 +185,8 @@
             const selectedId = document.getElementById('deleteSelect').value;
             if (selectedId) {
                 circles = circles.filter(c => c.id !== selectedId);
+                // Сброс lastNewX, если удалили, чтобы новые не уходили за пределы (опционально, можно убрать)
+                lastNewX = 50;
                 renderCircles();
                 document.getElementById('deleteSelect').value = '';
             } else {

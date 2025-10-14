@@ -56,6 +56,7 @@
         
         <div class="filters">
             <label>Класс: <select id="classFilter"><option value="">Все</option></select></label>
+            <label>Подкласс: <select id="subclassFilter"><option value="">Все</option></select></label>  <!-- Добавлен 6-й фильтр -->
             <label>Семейство: <select id="familyFilter"><option value="">Все</option></select></label>
             <label>Род: <select id="genusFilter"><option value="">Все</option></select></label>
             <label>Вид: <select id="speciesFilter"><option value="">Все</option></select></label>
@@ -66,20 +67,20 @@
     </div>
 
     <script>
-        // Дефолтные данные для тестирования (теперь как массив объектов для consistency с CSV)
+        // Дефолтные данные для тестирования (теперь 6 колонок для consistency с CSV)
         const defaultCircles = [
             { id: 'Круг1', x: 10, y: 10 },
             { id: 'Круг2', x: 20, y: 20 }
         ];
         const defaultTableData = [
-            { class: 'Класс1', family: 'Семейство1', genus: 'Род1', species: 'Вид1', variety: 'Сорт1' },
-            { class: 'Класс2', family: 'Семейство2', genus: 'Род2', species: 'Вид2', variety: 'Сорт2' }
+            { class: 'Класс1', subclass: 'Подкласс1', family: 'Семейство1', genus: 'Род1', species: 'Вид1', variety: 'Сорт1' },
+            { class: 'Класс2', subclass: 'Подкласс2', family: 'Семейство2', genus: 'Род2', species: 'Вид2', variety: 'Сорт2' }
         ];
 
-        // Функция для загрузки и парсинга CSV с разделителями ; и кодировкой Windows-1251
+        // Функция для загрузки и парсинга CSV (теперь 6 колонок)
         async function loadCSV() {
             try {
-                const response = await fetch('https://raw.githubusercontent.com/oluneva/my_site/main/Plants.csv'); // Замени на свой реальный URL на GitHub
+                const response = await fetch('https://raw.githubusercontent.com/твой_пользователь/твой_репозиторий/main/Plants.csv'); // Замени на свой реальный URL на GitHub
                 if (!response.ok) throw new Error('Не удалось загрузить CSV');
                 const buffer = await response.arrayBuffer();
                 const decoder = new TextDecoder('windows-1251');
@@ -88,13 +89,14 @@
                 const data = [];
                 for (let i = 1; i < lines.length; i++) { // Пропускаем заголовок
                     const cols = lines[i].split(';');
-                    if (cols.length >= 5) { // Ожидаем минимум 5 столбцов (class, family, genus, species, variety)
+                    if (cols.length >= 6) { // Ожидаем минимум 6 столбцов
                         data.push({
                             class: cols[0].trim(),
-                            family: cols[1].trim(), // Предполагаем, что cols[1] - family (если subclass, переименуйте)
-                            genus: cols[2].trim(),
-                            species: cols[3].trim(),
-                            variety: cols[4].trim()
+                            subclass: cols[1].trim(),
+                            family: cols[2].trim(),
+                            genus: cols[3].trim(),
+                            species: cols[4].trim(),
+                            variety: cols[5].trim()
                         });
                     }
                 }
@@ -141,24 +143,23 @@
             });
         }
 
-        // Заполнение фильтров уникальными значениями из tableData (адаптировано для объектов и 5 фильтров)
-        function populateFilters(selectedValues = []) {
-            // Убедимся, что selectedValues имеет длину равную количеству фильтров (5)
-            while (selectedValues.length < 5) {
-                selectedValues.push('Все');
-            }
+        // Заполнение фильтров уникальными значениями из tableData (адаптировано для 6 фильтров и каскадного обновления)
+        function populateFilters() {
+            // Инициализируем selectedValues с "Все" для всех 6 фильтров
+            let selectedValues = Array(6).fill('Все');
 
-            // Получаем все select элементы (используем правильные ID из HTML)
+            // Получаем все select элементы (теперь 6)
             const filters = [
                 document.getElementById('classFilter'),
+                document.getElementById('subclassFilter'),  // Добавлен
                 document.getElementById('familyFilter'),
                 document.getElementById('genusFilter'),
                 document.getElementById('speciesFilter'),
                 document.getElementById('varietyFilter')
             ];
 
-            // Ключи для фильтров (соответствуют структуре объектов в tableData)
-            const keys = ['class', 'family', 'genus', 'species', 'variety'];
+            // Ключи для фильтров (соответствуют структуре объектов в tableData, теперь 6)
+            const keys = ['class', 'subclass', 'family', 'genus', 'species', 'variety'];
 
             // Функция для получения уникальных значений из данных, отфильтрованных по предыдущим выборам
             function getFilteredOptions(index, prevSelections) {
@@ -177,7 +178,7 @@
                 return Array.from(options).sort();
             }
 
-            // Функция для обновления зависимых фильтров
+            // Функция для обновления зависимых фильтров (каскадное обновление)
             function updateDependentFilters(startIndex) {
                 for (let i = startIndex; i < filters.length; i++) {
                     const options = getFilteredOptions(i, selectedValues);
@@ -188,14 +189,15 @@
                         optElement.textContent = option;
                         filters[i].appendChild(optElement);
                     });
-                    // Устанавливаем выбранное значение, если оно есть
-                    if (selectedValues[i] && selectedValues[i] !== 'Все') {
+                    // Сохраняем выбранное значение, если оно всё ещё валидно, иначе сбрасываем на "Все"
+                    if (selectedValues[i] && selectedValues[i] !== 'Все' && options.includes(selectedValues[i])) {
                         filters[i].value = selectedValues[i];
                     } else {
                         selectedValues[i] = 'Все';
+                        filters[i].value = 'Все';
                     }
                 }
-                // После обновления фильтров, перерисовываем круги (фильтры пока не влияют на круги напрямую, но можно добавить логику)
+                // После обновления фильтров, перерисовываем круги (если нужно добавить фильтрацию кругов, добавьте логику здесь)
                 renderCircles();
             }
 
@@ -203,11 +205,11 @@
             filters.forEach((filter, index) => {
                 filter.addEventListener('change', () => {
                     selectedValues[index] = filter.value;
-                    updateDependentFilters(index + 1); // Обновляем последующие фильтры
+                    updateDependentFilters(index + 1); // Обновляем последующие фильтры начиная со следующего
                 });
             });
 
-            // Инициализируем фильтры с опциями
+            // Инициализируем фильтры с опциями (обновляем все с самого начала)
             updateDependentFilters(0);
         }
 
@@ -219,5 +221,3 @@
     </script>
 </body>
 </html>
-
-

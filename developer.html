@@ -6,43 +6,58 @@
     <title>Режим разработчика</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
+        #controls { margin-bottom: 20px; } /* Фильтры и кнопки сверху */
         #imageContainer { position: relative; display: inline-block; border: 1px solid #ccc; }
         #image { max-width: 100%; height: auto; }
-        .circle { position: absolute; width: 20px; height: 20px; border-radius: 50%; background-color: rgba(255, 0, 0, 0.5); cursor: move; }
-        .circle.selected { border: 2px solid blue; }
-        #controls { margin-top: 20px; }
+        .circle { position: absolute; width: 20px; height: 20px; border-radius: 50%; cursor: move; }
+        .circle.orange { background-color: rgba(255, 165, 0, 0.5); } /* Оранжевые для старых */
+        .circle.red { background-color: rgba(255, 0, 0, 0.5); } /* Красные для новых */
+        .circle.selected { border: 2px solid blue; } /* Выделение выбранного круга */
         select { margin-right: 10px; }
-        <!-- НОВОЕ: Стили для кнопки экспорта -->
-        #exportButton { background-color: #4CAF50; color: white; border: none; padding: 10px 20px; cursor: pointer; margin-left: 10px; }
-        #exportButton:hover { background-color: #45a049; }
+        button { background-color: #4CAF50; color: white; border: none; padding: 10px 20px; cursor: pointer; margin-left: 10px; }
+        button:hover { background-color: #45a049; }
+        #addForm { display: none; margin-top: 10px; } /* Скрытая форма для добавления */
+        #addForm input { margin-right: 10px; width: 100px; }
+        #deleteSelect { margin-left: 10px; }
     </style>
 </head>
 <body>
     <h1>Режим разработчика</h1>
-    <div id="imageContainer">
-        <img id="image" src="my-image.jpg" alt="Изображение" onload="init()">
-    </div>
     <div id="controls">
-        <!-- Фильтры (как в предыдущем коде) -->
+        <!-- Фильтры -->
         <label>Класс: <select id="classSelect"></select></label>
         <label>Подкласс: <select id="subclassSelect"></select></label>
         <label>Семейство: <select id="familySelect"></select></label>
         <label>Род: <select id="genusSelect"></select></label>
         <label>Вид: <select id="speciesSelect"></select></label>
         <label>Сорт: <select id="varietySelect"></select></label>
-        <!-- НОВОЕ: Кнопка экспорта -->
+        <!-- Кнопки управления кругами -->
+        <button id="addButton">Добавить круг</button>
+        <button id="saveButton">Сохранить круги</button>
+        <button id="deleteButton">Удалить круг</button>
+        <select id="deleteSelect"><option value="">Выберите круг для удаления</option></select>
         <button id="exportButton">Экспорт координат кругов</button>
+        <!-- Форма для добавления круга (показывается при клике на "Добавить круг") -->
+        <div id="addForm">
+            <label>ID: <input type="text" id="addId" placeholder="Имя круга"></label>
+            <button id="confirmAdd">Добавить</button>
+            <button id="cancelAdd">Отмена</button>
+        </div>
+    </div>
+    <div id="imageContainer">
+        <img id="image" src="my-image.jpg" alt="Изображение" onload="init()">
     </div>
 
     <script>
-        // Глобальные переменные (как в предыдущем коде)
+        // Глобальные переменные
         let circles = JSON.parse(localStorage.getItem('circles')) || [];
         let data = [];
         let selectedCircle = null;
         let offsetX, offsetY;
         let imageWidth, imageHeight;
+        let lastNewX = 50; // Для позиционирования новых кругов через кнопку
 
-        // Загрузка CSV (как в предыдущем коде)
+        // Загрузка CSV (без изменений)
         fetch('data.csv')
             .then(response => response.arrayBuffer())
             .then(buffer => {
@@ -57,45 +72,59 @@
                 });
             });
 
-        // Инициализация (как в предыдущем коде, с исправлениями)
+        // Инициализация
         function init() {
             const image = document.getElementById('image');
             imageWidth = image.naturalWidth;
             imageHeight = image.naturalHeight;
+            // Для старых кругов (из localStorage) устанавливаем цвет orange, если не указано
+            circles.forEach(circle => {
+                if (!circle.color) circle.color = 'orange';
+            });
             renderCircles();
-            initFilters();
+            updateDeleteSelect(); // Обновляем список для удаления
         }
 
-        // Рендеринг кругов (как в предыдущем коде)
+        // Рендеринг кругов
         function renderCircles() {
             const container = document.getElementById('imageContainer');
             container.querySelectorAll('.circle').forEach(c => c.remove());
             circles.forEach(circle => {
                 const div = document.createElement('div');
-                div.className = 'circle';
+                div.className = `circle ${circle.color}`;
                 div.id = circle.id;
                 div.style.left = (circle.x / 100 * imageWidth) + 'px';
                 div.style.top = (circle.y / 100 * imageHeight) + 'px';
                 div.addEventListener('mousedown', startDrag);
+                div.addEventListener('click', selectCircle); // Выбор круга
                 container.appendChild(div);
             });
             localStorage.setItem('circles', JSON.stringify(circles));
+            updateDeleteSelect();
         }
 
-        // Добавление нового круга (как в предыдущем коде)
+        // Выбор круга (для выделения и удаления)
+        function selectCircle(e) {
+            e.stopPropagation(); // Предотвращаем добавление нового круга
+            selectedCircle = e.target;
+            document.querySelectorAll('.circle').forEach(c => c.classList.remove('selected'));
+            selectedCircle.classList.add('selected');
+        }
+
+        // Добавление круга по клику на изображение (считаем "старым", оранжевым)
         document.getElementById('imageContainer').addEventListener('click', function(e) {
-            if (e.target.id !== 'image') return;
+            if (e.target.id !== 'image') return; // Не добавлять, если клик на круге
             const rect = e.target.getBoundingClientRect();
             const x = ((e.clientX - rect.left) / rect.width) * 100;
             const y = ((e.clientY - rect.top) / rect.height) * 100;
             const id = prompt('Введите имя круга:');
             if (id) {
-                circles.push({ id, x, y });
+                circles.push({ id, x, y, color: 'orange' });
                 renderCircles();
             }
         });
 
-        // Drag-and-drop (как в предыдущем коде)
+        // Drag-and-drop (без изменений)
         function startDrag(e) {
             selectedCircle = e.target;
             const rect = selectedCircle.getBoundingClientRect();
@@ -109,7 +138,7 @@
             if (!selectedCircle) return;
             const container = document.getElementById('imageContainer');
             const rect = container.getBoundingClientRect();
-            const x = ((e.clientX - rect.left - offsetX + 10) / rect.width) * 100; // +10 для центрирования
+            const x = ((e.clientX - rect.left - offsetX + 10) / rect.width) * 100;
             const y = ((e.clientY - rect.top - offsetY + 10) / rect.height) * 100;
             selectedCircle.style.left = (x / 100 * imageWidth) + 'px';
             selectedCircle.style.top = (y / 100 * imageHeight) + 'px';
@@ -125,7 +154,7 @@
             renderCircles();
         }
 
-        // Фильтры (как в предыдущем коде)
+        // Фильтры (без изменений)
         function initFilters() {
             const classSelect = document.getElementById('classSelect');
             const uniqueClasses = [...new Set(data.map(d => d['Класс']))].filter(Boolean);
@@ -135,22 +164,75 @@
                 option.textContent = cls;
                 classSelect.appendChild(option);
             });
-
             classSelect.addEventListener('change', updateFilters);
-            // Аналогично для других фильтров...
+            // Аналогично для других (опущено для краткости)
         }
 
         function updateFilters() {
-            // Логика каскадных фильтров (как в предыдущем коде)
+            // Логика каскадных фильтров (без изменений)
         }
 
-        // НОВОЕ: Обработчик экспорта
+        // Обработчики кнопок
+        document.getElementById('addButton').addEventListener('click', function() {
+            document.getElementById('addForm').style.display = 'block';
+        });
+
+        document.getElementById('confirmAdd').addEventListener('click', function() {
+            const id = document.getElementById('addId').value;
+            if (id) {
+                // Новый круг: красный, в центре или сдвинутый вправо
+                const x = lastNewX;
+                const y = 50; // Центр по Y
+                lastNewX += 10; // Сдвиг вправо на 10% при следующем добавлении
+                circles.push({ id, x, y, color: 'red' });
+                renderCircles();
+                document.getElementById('addForm').style.display = 'none';
+                // Очистка поля
+                document.getElementById('addId').value = '';
+            } else {
+                alert('Введите имя круга.');
+            }
+        });
+
+        document.getElementById('cancelAdd').addEventListener('click', function() {
+            document.getElementById('addForm').style.display = 'none';
+        });
+
+        document.getElementById('saveButton').addEventListener('click', function() {
+            localStorage.setItem('circles', JSON.stringify(circles));
+            alert('Круги сохранены!');
+        });
+
+        document.getElementById('deleteButton').addEventListener('click', function() {
+            const selectedId = document.getElementById('deleteSelect').value;
+            if (selectedId) {
+                circles = circles.filter(c => c.id !== selectedId);
+                renderCircles();
+                document.getElementById('deleteSelect').value = '';
+            } else {
+                alert('Выберите круг для удаления.');
+            }
+        });
+
+        // Обновление списка для удаления
+        function updateDeleteSelect() {
+            const select = document.getElementById('deleteSelect');
+            select.innerHTML = '<option value="">Выберите круг для удаления</option>';
+            circles.forEach(circle => {
+                const option = document.createElement('option');
+                option.value = circle.id;
+                option.textContent = circle.id;
+                select.appendChild(option);
+            });
+        }
+
+        // Экспорт (теперь включает color)
         document.getElementById('exportButton').addEventListener('click', function() {
             if (circles.length === 0) {
                 alert('Нет кругов для экспорта!');
                 return;
             }
-            const dataStr = JSON.stringify(circles, null, 2); // Форматированный JSON
+            const dataStr = JSON.stringify(circles, null, 2);
             const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
             const exportFileDefaultName = 'circles_export.json';
             const linkElement = document.createElement('a');
@@ -161,4 +243,3 @@
     </script>
 </body>
 </html>
-

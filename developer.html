@@ -35,6 +35,8 @@
     </div>
 
     <script>
+        console.log('Скрипт загружен'); // Отладка: скрипт загружается
+
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         const background = new Image();
@@ -170,10 +172,12 @@
             saveCircles();
             renderCircles();
             updateFilters(); // Обновить фильтры после добавления
+            console.log('Круг добавлен:', id, 'в позиции', x, y); // Отладка
         }
 
         // Обработчик для кнопки "Добавить круг" - добавляет круг в центре canvas
         document.getElementById('addCircleBtn').addEventListener('click', () => {
+            console.log('Кнопка "Добавить круг" нажата'); // Отладка
             const x = canvas.width / 2;
             const y = canvas.height / 2;
             addCircleAtPosition(x, y);
@@ -181,6 +185,7 @@
 
         // Загрузка фона и начальный рендер
         background.onload = () => {
+            console.log('Фон загружен'); // Отладка
             renderCircles();
         };
 

@@ -45,7 +45,6 @@
         let filteredData = [];
         let selectedFilters = { group: '', subgroup: '' };
         let draggedCircle = null;
-        let isAdding = false;
         let newCircles = new Set(); // Для отслеживания новых кругов (красные)
 
         // Функция загрузки CSV (асинхронно)
@@ -163,126 +162,30 @@
             return 'circle_' + (maxNum + 1);
         }
 
-        // Добавление круга
-        document.getElementById('addCircleBtn').addEventListener('click', () => {
-            isAdding = true;
-            canvas.style.cursor = 'crosshair';
-        });
-
-        canvas.addEventListener('click', e => {
-            if (isAdding) {
-                const rect = canvas.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
-                const id = generateId();
-                circles.push({ id, x, y });
-                newCircles.add(id); // Новый круг - красный
-                saveCircles();
-                renderCircles();
-                updateFilters(); // Обновить фильтры после добавления
-                isAdding = false;
-                canvas.style.cursor = 'crosshair';
-            }
-        });
-
-        // Удаление круга
-        document.getElementById('removeCircleBtn').addEventListener('click', () => {
-            const selectedCircleId = document.getElementById('subgroupSelect').value;
-            if (selectedCircleId) {
-                circles = circles.filter(c => c.id !== selectedCircleId);
-                newCircles.delete(selectedCircleId);
-                saveCircles();
-                renderCircles();
-                updateFilters();
-            }
-        });
-
-        // Кнопка "Сохранить изменения"
-        document.getElementById('saveChangesBtn').addEventListener('click', () => {
+        // Вспомогательная функция для добавления круга в позицию
+        function addCircleAtPosition(x, y) {
+            const id = generateId();
+            circles.push({ id, x, y });
+            newCircles.add(id); // Новый круг - красный
             saveCircles();
-            document.getElementById('status').textContent = 'Изменения сохранены!';
-            setTimeout(() => document.getElementById('status').textContent = 'Наведите курсор на круг и нажмите Delete для удаления. Перетаскивайте для перемещения.', 2000);
-        });
-
-        // Drag and drop
-        canvas.addEventListener('mousedown', e => {
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            draggedCircle = circles.find(c => Math.sqrt((c.x - x) ** 2 + (c.y - y) ** 2) < 15); // Радиус 15
-        });
-
-        canvas.addEventListener('mousemove', e => {
-            if (draggedCircle) {
-                const rect = canvas.getBoundingClientRect();
-                draggedCircle.x = e.clientX - rect.left;
-                draggedCircle.y = e.clientY - rect.top;
-                renderCircles();
-            }
-        });
-
-        canvas.addEventListener('mouseup', () => {
-            if (draggedCircle) {
-                saveCircles();
-                draggedCircle = null;
-            }
-        });
-
-        // Экспорт JSON
-        document.getElementById('exportBtn').addEventListener('click', () => {
-            const dataStr = JSON.stringify(circles, null, 2);
-            const dataBlob = new Blob([dataStr], { type: 'application/json' });
-            const url = URL.createObjectURL(dataBlob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = 'circles_export.json';
-            link.click();
-        });
-
-        // Импорт JSON
-        document.getElementById('importBtn').addEventListener('click', () => {
-            document.getElementById('importInput').click();
-        });
-
-        document.getElementById('importInput').addEventListener('change', e => {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = () => {
-                    try {
-                        let imported = JSON.parse(reader.result);
-                        imported = imported.filter(circle => circle && typeof circle.id === 'string' && circle.id.trim() !== '' && typeof circle.x === 'number' && typeof circle.y === 'number');
-                        // Убрать дубликаты ID и перенумеровать
-                        const uniqueIds = new Set();
-                        circles = imported.filter(circle => {
-                            if (uniqueIds.has(circle.id)) return false;
-                            uniqueIds.add(circle.id);
-                            return true;
-                        });
-                        // Если нужно, перенумеровать (но пока оставим как есть, если ID корректные)
-                        saveCircles();
-                        renderCircles();
-                        updateFilters();
-                    } catch (err) {
-                        alert('Ошибка при импорте JSON');
-                    }
-                };
-                reader.readAsText(file);
-            }
-        });
-
-        // Переход в пользовательский режим
-        document.getElementById('switchToUserBtn').addEventListener('click', () => {
-            window.location.href = 'index.html';
-        });
-
-        // Инициализация
-        (async () => {
-            await loadCSV();
             renderCircles();
-        })();
-        background.onload = renderCircles;
-        background.onerror = renderCircles;
+            updateFilters(); // Обновить фильтры после добавления
+        }
+
+        // Обработчик для кнопки "Добавить круг" - добавляет круг в центре canvas
+        document.getElementById('addCircleBtn').addEventListener('click', () => {
+            const x = canvas.width / 2;
+            const y = canvas.height / 2;
+            addCircleAtPosition(x, y);
+        });
+
+        // Загрузка фона и начальный рендер
+        background.onload = () => {
+            renderCircles();
+        };
+
+        // Загрузка CSV при старте
+        loadCSV();
     </script>
 </body>
 </html>

@@ -8,64 +8,46 @@
         #container { display: flex; flex-direction: column; align-items: center; }
         #filters { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
         select { padding: 5px; }
-        #canvas { border: 1px solid #000; cursor: pointer; }
-        .circle { position: absolute; border-radius: 50%; cursor: move; }
-        .new-circle { background-color: red; }
-        .old-circle { background-color: orange; }
-        #controls { margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+        #controls { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
         button { padding: 10px; }
+        #canvas { border: 1px solid #000; cursor: crosshair; }
+        #status { margin-top: 10px; font-size: 14px; color: #555; }
     </style>
 </head>
 <body>
     <div id="container">
         <h1>Режим разработчика</h1>
         <div id="filters">
-            <select id="classSelect"><option>Выберите Класс</option></select>
-            <select id="subclassSelect"><option>Выберите Подкласс</option></select>
-            <select id="typeSelect"><option>Выберите Тип</option></select>
-            <select id="subtypeSelect"><option>Выберите Подтип</option></select>
             <select id="groupSelect"><option>Выберите Группу</option></select>
-            <select id="subgroupSelect"><option>Выберите Подгруппу</option></select>
+            <select id="subgroupSelect"><option>Выберите Круг</option></select>
         </div>
-        <canvas id="canvas" width="800" height="600"></canvas>
         <div id="controls">
             <button id="addCircleBtn">Добавить круг</button>
-            <select id="circleSelect"><option value="">Выберите круг для удаления</option></select>
-            <button id="deleteCircleBtn">Удалить круг</button>
+            <button id="removeCircleBtn">Удалить круг</button>
             <button id="exportBtn">Экспорт JSON</button>
-            <input type="file" id="importFile" accept=".json">
+            <input type="file" id="importInput" accept=".json" style="display: none;">
+            <button id="importBtn">Импорт JSON</button>
             <button id="switchToUserBtn">Перейти в пользовательский режим</button>
         </div>
+        <canvas id="canvas" width="800" height="600"></canvas>
+        <div id="status">Наведите курсор на круг и нажмите Delete для удаления. Перетаскивайте для перемещения.</div>
     </div>
 
     <script>
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         const background = new Image();
-        background.src = 'https://raw.githubusercontent.com/oluneva/my_site/main/my-plants.jpg'; // Замените на ваш фон
+        background.src = 'https://github.com/oluneva/my_site/raw/main/my-image.jpg'; // Обновлено: новое имя файла
 
-        let circles = JSON.parse(localStorage.getItem('circles')) || [];
-        // Фильтрация невалидных элементов
-        circles = circles.filter(circle => circle && circle.id && circle.id.trim() !== '');
-        // Инициализация дефолтных кругов, если пусто
-        if (circles.length === 0) {
-            circles = [
-                { id: 'circle_1', x: 100, y: 100, type: 'Тип1', isNew: false },
-                { id: 'circle_2', x: 200, y: 200, type: 'Тип2', isNew: false },
-                { id: 'circle_3', x: 300, y: 300, type: 'Тип3', isNew: false }
-            ];
-            localStorage.setItem('circles', JSON.stringify(circles));
-        }
-
+        let circles = JSON.parse(localStorage.getItem('circles')) || []; // Загружаем из localStorage
         let data = []; // Данные из CSV
         let filteredData = [];
-        let selectedFilters = { class: '', subclass: '', type: '', subtype: '', group: '', subgroup: '' };
-        let isDragging = false;
-        let dragIndex = -1;
-        // Исправление: корректная инициализация nextId
-        let nextId = circles.length > 0 ? Math.max(...circles.map(c => parseInt(c.id.split('_')[1]) || 0)) + 1 : 1;
+        let selectedFilters = { group: '', subgroup: '' };
+        let draggedCircle = null;
+        let isAdding = false;
+        let newCircles = new Set(); // Для отслеживания новых кругов (красные)
 
-        // Загрузка CSV (асинхронно)
+        // Функция загрузки CSV (асинхронно)
         async function loadCSV() {
             try {
                 const response = await fetch('https://raw.githubusercontent.com/oluneva/my_site/main/Plants.csv');
@@ -81,8 +63,8 @@
             } catch (e) {
                 console.warn('CSV не загружен, используем демо-данные:', e.message);
                 data = [
-                    { Класс: 'Класс1', Подкласс: 'Подкласс1', Тип: 'Тип1', Подтип: 'Подтип1', Группа: 'Группа1', Подгруппа: 'Подгруппа1' },
-                    { Класс: 'Класс2', Подкласс: 'Подкласс2', Тип: 'Тип2', Подтип: 'Подтип2', Группа: 'Группа2', Подгруппа: 'Подгруппа2' }
+                    { Группа: 'Группа1', Подгруппа: 'Подгруппа1' },
+                    { Группа: 'Группа2', Подгруппа: 'Подгруппа2' }
                 ];
                 filteredData = data;
                 updateFilters();
@@ -107,116 +89,164 @@
         }
 
         function updateFilters() {
-            const selects = ['classSelect', 'subclassSelect', 'typeSelect', 'subtypeSelect', 'groupSelect', 'subgroupSelect'];
-            const keys = ['Класс', 'Подкласс', 'Тип', 'Подтип', 'Группа', 'Подгруппа'];
+            const selects = ['groupSelect', 'subgroupSelect'];
+            const keys = ['Группа', 'Подгруппа'];
             selects.forEach((id, i) => {
                 const select = document.getElementById(id);
-                select.innerHTML = `<option>Выберите ${keys[i]}</option>`;
-                const unique = [...new Set(filteredData.map(d => d[keys[i]]))].filter(v => v);
-                unique.forEach(val => {
-                    const option = document.createElement('option');
-                    option.value = val;
-                    option.textContent = val;
-                    select.appendChild(option);
-                });
+                select.innerHTML = `<option>Выберите ${i === 0 ? 'Группу' : 'Круг'}</option>`;
+                if (i === 0) {
+                    const unique = [...new Set(filteredData.map(d => d[keys[i]]))].filter(v => v);
+                    unique.forEach(val => {
+                        const option = document.createElement('option');
+                        option.value = val;
+                        option.textContent = val;
+                        select.appendChild(option);
+                    });
+                } else {
+                    // Для последнего фильтра: показать ID кругов, соответствующих выбранным фильтрам
+                    const matchingCircles = circles.filter(circle => {
+                        const circleType = circle.type || 'Группа1';
+                        return (!selectedFilters.group || circleType.includes(selectedFilters.group)) &&
+                               (!selectedFilters.subgroup || circleType.includes(selectedFilters.subgroup));
+                    });
+                    matchingCircles.forEach(circle => {
+                        const option = document.createElement('option');
+                        option.value = circle.id;
+                        option.textContent = circle.id;
+                        select.appendChild(option);
+                    });
+                }
             });
         }
 
         function cascadeFilters(changedKey) {
-            const keys = ['Класс', 'Подкласс', 'Тип', 'Подтип', 'Группа', 'Подгруппа'];
+            const keys = ['Группа', 'Подгруппа'];
             const index = keys.indexOf(changedKey);
             filteredData = data.filter(d => {
                 return keys.slice(0, index + 1).every(key => !selectedFilters[key.toLowerCase()] || d[key] === selectedFilters[key.toLowerCase()]);
             });
             updateFilters();
-            renderCircles();
         }
 
         // Обработчики фильтров
-        document.getElementById('classSelect').addEventListener('change', e => { selectedFilters.class = e.target.value; cascadeFilters('Класс'); });
-        document.getElementById('subclassSelect').addEventListener('change', e => { selectedFilters.subclass = e.target.value; cascadeFilters('Подкласс'); });
-        document.getElementById('typeSelect').addEventListener('change', e => { selectedFilters.type = e.target.value; cascadeFilters('Тип'); });
-        document.getElementById('subtypeSelect').addEventListener('change', e => { selectedFilters.subtype = e.target.value; cascadeFilters('Подтип'); });
         document.getElementById('groupSelect').addEventListener('change', e => { selectedFilters.group = e.target.value; cascadeFilters('Группа'); });
         document.getElementById('subgroupSelect').addEventListener('change', e => { selectedFilters.subgroup = e.target.value; cascadeFilters('Подгруппа'); });
-
-        function updateCircleSelect() {
-            const select = document.getElementById('circleSelect');
-            select.innerHTML = '<option value="">Выберите круг для удаления</option>';
-            circles.filter(circle => circle && circle.id && circle.id.trim() !== '').forEach(circle => {
-                const option = document.createElement('option');
-                option.value = circle.id;
-                option.textContent = circle.id;
-                select.appendChild(option);
-            });
-        }
 
         function renderCircles() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
             circles.forEach(circle => {
                 if (!circle || !circle.id) return;
-                const color = circle.isNew ? 'red' : 'orange';
                 ctx.beginPath();
                 ctx.arc(circle.x, circle.y, 20, 0, 2 * Math.PI);
-                ctx.fillStyle = color;
+                ctx.fillStyle = newCircles.has(circle.id) ? 'red' : 'orange'; // Новые красные, старые оранжевые
                 ctx.fill();
                 ctx.stroke();
                 ctx.fillStyle = 'white';
                 ctx.font = '12px Arial';
                 ctx.fillText(circle.id, circle.x - 15, circle.y + 5);
             });
-            updateCircleSelect();
+        }
+
+        function saveCircles() {
+            localStorage.setItem('circles', JSON.stringify(circles));
+        }
+
+        function generateId() {
+            return 'circle_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
         }
 
         // Добавление круга
         document.getElementById('addCircleBtn').addEventListener('click', () => {
-            const type = selectedFilters.type || 'Тип1';
-            circles.push({ id: `circle_${nextId++}`, x: Math.random() * 700 + 50, y: Math.random() * 500 + 50, type, isNew: true });
-            localStorage.setItem('circles', JSON.stringify(circles));
-            renderCircles();
+            isAdding = true;
+            canvas.style.cursor = 'crosshair';
+        });
+
+        canvas.addEventListener('click', e => {
+            if (isAdding) {
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const id = generateId();
+                circles.push({ id, x, y });
+                newCircles.add(id); // Новый круг - красный
+                saveCircles();
+                renderCircles();
+                updateFilters(); // Обновить фильтры после добавления
+                isAdding = false;
+                canvas.style.cursor = 'crosshair';
+            }
         });
 
         // Удаление круга
-        document.getElementById('deleteCircleBtn').addEventListener('click', () => {
-            const selectedId = document.getElementById('circleSelect').value;
-            if (!selectedId) return alert('Выберите круг!');
-            circles = circles.filter(circle => circle.id !== selectedId);
-            localStorage.setItem('circles', JSON.stringify(circles));
-            renderCircles();
+        document.getElementById('removeCircleBtn').addEventListener('click', () => {
+            const selectedCircleId = document.getElementById('subgroupSelect').value;
+            if (selectedCircleId) {
+                circles = circles.filter(c => c.id !== selectedCircleId);
+                newCircles.delete(selectedCircleId);
+                saveCircles();
+                renderCircles();
+                updateFilters();
+            }
+        });
+
+        // Drag and drop
+        canvas.addEventListener('mousedown', e => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            draggedCircle = circles.find(c => Math.sqrt((c.x - x) ** 2 + (c.y - y) ** 2) < 20);
+        });
+
+        canvas.addEventListener('mousemove', e => {
+            if (draggedCircle) {
+                const rect = canvas.getBoundingClientRect();
+                draggedCircle.x = e.clientX - rect.left;
+                draggedCircle.y = e.clientY - rect.top;
+                renderCircles();
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            if (draggedCircle) {
+                saveCircles();
+                draggedCircle = null;
+            }
         });
 
         // Экспорт JSON
         document.getElementById('exportBtn').addEventListener('click', () => {
-            const dataStr = JSON.stringify(circles.map(c => ({ id: c.id, x: c.x, y: c.y, type: c.type })), null, 2);
-            const blob = new Blob([dataStr], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'circles.json';
-            a.click();
-            URL.revokeObjectURL(url);
+            const dataStr = JSON.stringify(circles, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'circles_export.json';
+            link.click();
         });
 
         // Импорт JSON
-        document.getElementById('importFile').addEventListener('change', e => {
+        document.getElementById('importBtn').addEventListener('click', () => {
+            document.getElementById('importInput').click();
+        });
+
+        document.getElementById('importInput').addEventListener('change', e => {
             const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = () => {
-                try {
-                    const imported = JSON.parse(reader.result);
-                    if (!Array.isArray(imported)) throw new Error('Файл должен содержать массив объектов');
-                    circles = imported.filter(c => c && c.id && typeof c.x === 'number' && typeof c.y === 'number').map(c => ({ ...c, isNew: false }));
-                    nextId = circles.length > 0 ? Math.max(...circles.map(c => parseInt(c.id.split('_')[1]) || 0)) + 1 : 1;
-                    localStorage.setItem('circles', JSON.stringify(circles));
-                    renderCircles();
-                    alert('Импорт успешен!');
-                } catch (err) {
-                    alert('Ошибка импорта: ' + err.message);
-                }
-            };
-            reader.readAsText(file);
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    try {
+                        circles = JSON.parse(reader.result);
+                        circles = circles.filter(circle => circle && typeof circle.id === 'string' && circle.id.trim() !== '' && typeof circle.x === 'number' && typeof circle.y === 'number');
+                        saveCircles();
+                        renderCircles();
+                        updateFilters();
+                    } catch (err) {
+                        alert('Ошибка при импорте JSON');
+                    }
+                };
+                reader.readAsText(file);
+            }
         });
 
         // Переход в пользовательский режим
@@ -224,39 +254,13 @@
             window.location.href = 'index.html';
         });
 
-        // Drag-and-drop
-        canvas.addEventListener('mousedown', e => {
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            dragIndex = circles.findIndex(circle => Math.sqrt((circle.x - x) ** 2 + (circle.y - y) ** 2) < 20);
-            if (dragIndex !== -1) isDragging = true;
-        });
-
-        canvas.addEventListener('mousemove', e => {
-            if (!isDragging || dragIndex === -1) return;
-            const rect = canvas.getBoundingClientRect();
-            circles[dragIndex].x = e.clientX - rect.left;
-            circles[dragIndex].y = e.clientY - rect.top;
+        // Инициализация
+        (async () => {
+            await loadCSV();
             renderCircles();
-        });
-
-        canvas.addEventListener('mouseup', () => {
-            if (isDragging) {
-                localStorage.setItem('circles', JSON.stringify(circles));
-                isDragging = false;
-                dragIndex = -1;
-            }
-        });
-
-        background.onload = () => {
-            loadCSV().then(() => renderCircles());
-        };
-        background.onerror = () => {
-            console.warn('Фон не загружен, рендерим без него');
-            loadCSV().then(() => renderCircles());
-        };
+        })();
+        background.onload = renderCircles;
+        background.onerror = renderCircles;
     </script>
 </body>
 </html>
-

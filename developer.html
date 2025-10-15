@@ -1,224 +1,288 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Developer Mode - Circle Editor</title>
+    <title>Режим разработчика - Управление кругами</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin: 0;
-            background-color: #f0f0f0;
-        }
-        #canvas {
-            border: 1px solid #000;
-            margin-bottom: 20px;
-        }
-        #controls {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            justify-content: center;
-        }
-        button {
-            padding: 10px 15px;
-            font-size: 16px;
-            cursor: pointer;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 5px;
-        }
-        button:hover {
-            background-color: #45a049;
-        }
-        #filters {
-            margin-top: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        #filters label {
-            margin: 5px 0;
-        }
-        #filters input {
-            margin-left: 10px;
-        }
-        #circleList {
-            margin-top: 20px;
-            max-height: 200px;
-            overflow-y: auto;
-            width: 300px;
-        }
-        .circle-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 5px;
-            border: 1px solid #ddd;
-            margin-bottom: 5px;
-        }
-        .circle-item button {
-            padding: 5px 10px;
-            font-size: 12px;
-            background-color: #f44336;
-            color: white;
-        }
-        .circle-item button:hover {
-            background-color: #d32f2f;
-        }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f0f0f0; }
+        #container { display: flex; flex-direction: column; align-items: center; }
+        #filters { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+        select { padding: 5px; }
+        #controls { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+        button { padding: 10px; }
+        #canvas { border: 1px solid #000; cursor: crosshair; }
+        #status { margin-top: 10px; font-size: 14px; color: #555; }
     </style>
 </head>
 <body>
-    <h1>Developer Mode - Circle Editor</h1>
-    <canvas id="canvas" width="800" height="600"></canvas>
-    <div id="controls">
-        <button id="addCircleBtn">Добавить круг</button>
-        <button id="clearBtn">Очистить</button>
-        <button id="saveBtn">Сохранить</button>
-        <button id="loadBtn">Загрузить</button>
+    <div id="container">
+        <h1>Режим разработчика</h1>
+        <div id="filters">
+            <select id="groupSelect"><option>Выберите Сорт</option></select>
+            <select id="subgroupSelect"><option>Выберите Круг</option></select>
+        </div>
+        <div id="controls">
+            <button id="addCircleBtn">Добавить круг</button>
+            <button id="removeCircleBtn">Удалить круг</button>
+            <button id="saveChangesBtn">Сохранить изменения</button>
+            <button id="exportBtn">Экспорт JSON</button>
+            <input type="file" id="importInput" accept=".json" style="display: none;">
+            <button id="importBtn">Импорт JSON</button>
+            <button id="switchToUserBtn">Перейти в пользовательский режим</button>
+        </div>
+        <canvas id="canvas" width="800" height="600"></canvas>
+        <div id="status">Наведите курсор на круг и нажмите Delete для удаления. Перетаскивайте для перемещения.</div>
     </div>
-    <div id="filters">
-        <label><input type="checkbox" id="showAll"> Показать все</label>
-        <label><input type="checkbox" id="showNew"> Показать новые (красные)</label>
-        <label><input type="checkbox" id="showOld"> Показать старые (синие)</label>
-    </div>
-    <div id="circleList"></div>
 
     <script>
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-        let circles = [];
-        let newCircles = new Set(); // Для отслеживания новых кругов
-        let background = new Image();
-        background.src = 'https://raw.githubusercontent.com/rolling-scopes-school/stage1-tasks/assets/images/evening/01.jpg'; // Пример фона
+        const background = new Image();
+        background.src = 'https://github.com/oluneva/my_site/raw/main/my-image.jpg'; // Обновлено: новое имя файла
 
-        // Генерация уникального ID
-        function generateId() {
-            return Date.now() + Math.random();
-        }
+        let circles = JSON.parse(localStorage.getItem('circles')) || []; // Загружаем из localStorage
+        let data = []; // Данные из CSV
+        let filteredData = [];
+        let selectedFilters = { group: '', subgroup: '' };
+        let draggedCircle = null;
+        let isAdding = false;
+        let newCircles = new Set(); // Для отслеживания новых кругов (красные)
 
-        // Сохранение кругов в localStorage
-        function saveCircles() {
-            localStorage.setItem('circles', JSON.stringify(circles));
-        }
-
-        // Загрузка кругов из localStorage
-        function loadCircles() {
-            const saved = localStorage.getItem('circles');
-            if (saved) {
-                circles = JSON.parse(saved);
-                renderCircles();
+        // Функция загрузки CSV (асинхронно)
+        async function loadCSV() {
+            try {
+                const response = await fetch('https://raw.githubusercontent.com/oluneva/my_site/main/Plants.csv');
+                if (!response.ok) throw new Error('Файл не найден');
+                const buffer = await response.arrayBuffer();
+                const decoder = new TextDecoder('windows-1251');
+                const csvText = decoder.decode(buffer);
+                data = parseCSV(csvText);
+                if (data.length === 0) throw new Error('CSV пустой или некорректный');
+                filteredData = data;
+                console.log('CSV загружен успешно:', data.length, 'строк');
+                updateFilters();
+            } catch (e) {
+                console.warn('CSV не загружен, используем демо-данные:', e.message);
+                data = [
+                    { Сорт: 'Сорт1', Подгруппа: 'Подгруппа1' },
+                    { Сорт: 'Сорт2', Подгруппа: 'Подгруппа2' }
+                ];
+                filteredData = data;
                 updateFilters();
             }
         }
 
-        // Рендеринг кругов
-        function renderCircles() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            // Рисуем фон, если загружен
-            if (background.complete) {
-                ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+        function parseCSV(csvText) {
+            const lines = csvText.split('\n').filter(line => line.trim());
+            if (lines.length < 1) return [];
+            const headers = lines[0].split(',').map(h => h.trim());
+            const expectedHeaders = ['Класс', 'Подкласс', 'Тип', 'Подтип', 'Сорт', 'Подгруппа'];
+            if (!expectedHeaders.every(h => headers.includes(h))) {
+                console.warn('Заголовки CSV не совпадают, используем демо-данные');
+                return [];
             }
-            // Рисуем круги
-            circles.forEach(circle => {
-                if (newCircles.has(circle.id)) {
-                    ctx.fillStyle = 'red';
+            return lines.slice(1).map(line => {
+                const values = line.split(',');
+                let obj = {};
+                headers.forEach((h, i) => obj[h] = values[i]?.trim() || '');
+                return obj;
+            }).filter(obj => obj['Класс']); // Фильтр пустых строк
+        }
+
+        function updateFilters() {
+            const selects = ['groupSelect', 'subgroupSelect'];
+            const keys = ['Сорт', 'Подгруппа'];
+            selects.forEach((id, i) => {
+                const select = document.getElementById(id);
+                select.innerHTML = `<option>Выберите ${i === 0 ? 'Сорт' : 'Круг'}</option>`;
+                if (i === 0) {
+                    const unique = [...new Set(filteredData.map(d => d[keys[i]]))].filter(v => v);
+                    unique.forEach(val => {
+                        const option = document.createElement('option');
+                        option.value = val;
+                        option.textContent = val;
+                        select.appendChild(option);
+                    });
                 } else {
-                    ctx.fillStyle = 'blue';
+                    // Для последнего фильтра: показать ID кругов, соответствующих выбранным фильтрам, без пустых и дубликатов
+                    const matchingCircles = circles.filter(c => c.id && c.id.trim() !== '').filter(circle => {
+                        const circleType = circle.type || 'Сорт1';
+                        return (!selectedFilters.group || circleType.includes(selectedFilters.group)) &&
+                               (!selectedFilters.subgroup || circleType.includes(selectedFilters.subgroup));
+                    });
+                    const uniqueIds = [...new Set(matchingCircles.map(c => c.id))];
+                    uniqueIds.forEach(id => {
+                        const option = document.createElement('option');
+                        option.value = id;
+                        option.textContent = id;
+                        select.appendChild(option);
+                    });
                 }
-                ctx.beginPath();
-                ctx.arc(circle.x, circle.y, 15, 0, Math.PI * 2);
-                ctx.fill();
             });
         }
 
-        // Обновление фильтров и списка кругов
-        function updateFilters() {
-            const showAll = document.getElementById('showAll').checked;
-            const showNew = document.getElementById('showNew').checked;
-            const showOld = document.getElementById('showOld').checked;
+        function cascadeFilters(changedKey) {
+            const keys = ['Сорт', 'Подгруппа'];
+            const index = keys.indexOf(changedKey);
+            filteredData = data.filter(d => {
+                return keys.slice(0, index + 1).every(key => !selectedFilters[key.toLowerCase()] || d[key] === selectedFilters[key.toLowerCase()]);
+            });
+            updateFilters();
+        }
 
-            const circleList = document.getElementById('circleList');
-            circleList.innerHTML = '';
+        // Обработчики фильтров
+        document.getElementById('groupSelect').addEventListener('change', e => { selectedFilters.group = e.target.value; cascadeFilters('Сорт'); });
+        document.getElementById('subgroupSelect').addEventListener('change', e => { selectedFilters.subgroup = e.target.value; cascadeFilters('Подгруппа'); });
 
+        function renderCircles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
             circles.forEach(circle => {
-                let visible = false;
-                if (showAll || (showNew && newCircles.has(circle.id)) || (showOld && !newCircles.has(circle.id))) {
-                    visible = true;
-                }
+                if (!circle || !circle.id) return;
+                ctx.beginPath();
+                ctx.arc(circle.x, circle.y, 15, 0, 2 * Math.PI); // Уменьшен радиус до 15
+                ctx.fillStyle = newCircles.has(circle.id) ? 'red' : 'orange'; // Новые красные, старые оранжевые
+                ctx.fill();
+                ctx.stroke();
+                // Убрана подпись: ctx.fillText(circle.id, circle.x - 15, circle.y + 5);
+            });
+        }
 
-                if (visible) {
-                    const item = document.createElement('div');
-                    item.className = 'circle-item';
-                    item.textContent = `Круг ${circle.id.toFixed(0)}: (${circle.x.toFixed(0)}, ${circle.y.toFixed(0)})`;
-                    const deleteBtn = document.createElement('button');
-                    deleteBtn.textContent = 'Удалить';
-                    deleteBtn.addEventListener('click', () => {
-                        circles = circles.filter(c => c.id !== circle.id);
-                        newCircles.delete(circle.id);
+        function saveCircles() {
+            localStorage.setItem('circles', JSON.stringify(circles));
+        }
+
+        function generateId() {
+            // Найти все существующие ID, извлечь номера, найти max
+            const existingIds = circles.map(c => c.id).filter(id => id && id.startsWith('circle_'));
+            let maxNum = 0;
+            existingIds.forEach(id => {
+                const num = parseInt(id.replace('circle_', ''));
+                if (!isNaN(num) && num > maxNum) maxNum = num;
+            });
+            return 'circle_' + (maxNum + 1);
+        }
+
+        // Добавление круга
+        document.getElementById('addCircleBtn').addEventListener('click', () => {
+            isAdding = true;
+            canvas.style.cursor = 'crosshair';
+        });
+
+        canvas.addEventListener('click', e => {
+            if (isAdding) {
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const id = generateId();
+                circles.push({ id, x, y });
+                newCircles.add(id); // Новый круг - красный
+                saveCircles();
+                renderCircles();
+                updateFilters(); // Обновить фильтры после добавления
+                isAdding = false;
+                canvas.style.cursor = 'crosshair';
+            }
+        });
+
+        // Удаление круга
+        document.getElementById('removeCircleBtn').addEventListener('click', () => {
+            const selectedCircleId = document.getElementById('subgroupSelect').value;
+            if (selectedCircleId) {
+                circles = circles.filter(c => c.id !== selectedCircleId);
+                newCircles.delete(selectedCircleId);
+                saveCircles();
+                renderCircles();
+                updateFilters();
+            }
+        });
+
+        // Кнопка "Сохранить изменения"
+        document.getElementById('saveChangesBtn').addEventListener('click', () => {
+            saveCircles();
+            document.getElementById('status').textContent = 'Изменения сохранены!';
+            setTimeout(() => document.getElementById('status').textContent = 'Наведите курсор на круг и нажмите Delete для удаления. Перетаскивайте для перемещения.', 2000);
+        });
+
+        // Drag and drop
+        canvas.addEventListener('mousedown', e => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            draggedCircle = circles.find(c => Math.sqrt((c.x - x) ** 2 + (c.y - y) ** 2) < 15); // Радиус 15
+        });
+
+        canvas.addEventListener('mousemove', e => {
+            if (draggedCircle) {
+                const rect = canvas.getBoundingClientRect();
+                draggedCircle.x = e.clientX - rect.left;
+                draggedCircle.y = e.clientY - rect.top;
+                renderCircles();
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            if (draggedCircle) {
+                saveCircles();
+                draggedCircle = null;
+            }
+        });
+
+        // Экспорт JSON
+        document.getElementById('exportBtn').addEventListener('click', () => {
+            const dataStr = JSON.stringify(circles, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'circles_export.json';
+            link.click();
+        });
+
+        // Импорт JSON
+        document.getElementById('importBtn').addEventListener('click', () => {
+            document.getElementById('importInput').click();
+        });
+
+        document.getElementById('importInput').addEventListener('change', e => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    try {
+                        let imported = JSON.parse(reader.result);
+                        imported = imported.filter(circle => circle && typeof circle.id === 'string' && circle.id.trim() !== '' && typeof circle.x === 'number' && typeof circle.y === 'number');
+                        // Убрать дубликаты ID и перенумеровать
+                        const uniqueIds = new Set();
+                        circles = imported.filter(circle => {
+                            if (uniqueIds.has(circle.id)) return false;
+                            uniqueIds.add(circle.id);
+                            return true;
+                        });
+                        // Если нужно, перенумеровать (но пока оставим как есть, если ID корректные)
                         saveCircles();
                         renderCircles();
                         updateFilters();
-                    });
-                    item.appendChild(deleteBtn);
-                    circleList.appendChild(item);
-                }
-            });
-
-            renderCircles();
-        }
-
-        // Вспомогательная функция для добавления круга в позицию
-        function addCircleAtPosition(x, y) {
-            const id = generateId();
-            circles.push({ id, x, y });
-            newCircles.add(id); // Новый круг - красный
-            saveCircles();
-            renderCircles();
-            updateFilters(); // Обновить фильтры после добавления
-        }
-
-        // Обработчики кнопок
-        document.getElementById('addCircleBtn').addEventListener('click', () => {
-            let x, y;
-            if (circles.length > 0) {
-                // Найти последний добавленный круг (по индексу в массиве)
-                const lastCircle = circles[circles.length - 1];
-                x = lastCircle.x + 8; // Сдвиг на 1% вправо (8px при ширине 800)
-                y = lastCircle.y; // Та же высота
-                // Если выходит за пределы, сбросить в начало (опционально)
-                if (x > canvas.width - 15) x = 50; // Сброс влево, если слишком далеко
-            } else {
-                // Если кругов нет, добавить в центр
-                x = canvas.width / 2;
-                y = canvas.height / 2;
+                    } catch (err) {
+                        alert('Ошибка при импорте JSON');
+                    }
+                };
+                reader.readAsText(file);
             }
-            addCircleAtPosition(x, y);
         });
 
-        document.getElementById('clearBtn').addEventListener('click', () => {
-            circles = [];
-            newCircles.clear();
-            saveCircles();
+        // Переход в пользовательский режим
+        document.getElementById('switchToUserBtn').addEventListener('click', () => {
+            window.location.href = 'index.html';
+        });
+
+        // Инициализация
+        (async () => {
+            await loadCSV();
             renderCircles();
-            updateFilters();
-        });
-
-        document.getElementById('saveBtn').addEventListener('click', saveCircles);
-        document.getElementById('loadBtn').addEventListener('click', loadCircles);
-
-        // Обработчики фильтров
-        document.getElementById('showAll').addEventListener('change', updateFilters);
-        document.getElementById('showNew').addEventListener('change', updateFilters);
-        document.getElementById('showOld').addEventListener('change', updateFilters);
-
-        // Загрузка фона и начальный рендер
-        background.onload = () => renderCircles();
-        loadCircles(); // Загрузить сохранённые круги при старте
+        })();
+        background.onload = renderCircles;
+        background.onerror = renderCircles;
     </script>
 </body>
 </html>

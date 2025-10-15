@@ -8,9 +8,9 @@
         #container { display: flex; flex-direction: column; align-items: center; }
         #filters { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
         select { padding: 5px; }
-        #canvas { border: 1px solid #000; }
-        #controls { margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+        #controls { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
         button { padding: 10px; }
+        #canvas { border: 1px solid #000; }
     </style>
 </head>
 <body>
@@ -24,18 +24,18 @@
             <select id="groupSelect"><option>Выберите Группу</option></select>
             <select id="subgroupSelect"><option>Выберите Круг</option></select>
         </div>
-        <canvas id="canvas" width="800" height="600"></canvas>
         <div id="controls">
             <button id="findPlantBtn">Найти растение</button>
             <button id="switchToDeveloperBtn">Перейти в режим разработчика</button>
         </div>
+        <canvas id="canvas" width="800" height="600"></canvas>
     </div>
 
     <script>
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         const background = new Image();
-        background.src = 'https://raw.githubusercontent.com/oluneva/my_site/main/my-plants.jpg'; // Фоновое изображение с GitHub
+        background.src = 'https://github.com/oluneva/my_site/raw/main/my-image.jpg'; // Обновлено: новое имя файла
 
         let circles = []; // Инициализируем пустым массивом
         let data = []; // Данные из CSV

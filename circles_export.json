@@ -1,0 +1,73 @@
+[
+   {
+    "id": "circle_1",
+    "x": 655.5,
+    "y": 363.125,
+    "color": "orange"
+  },
+  {
+    "id": "circle_2",
+    "x": 285.5,
+    "y": 94.125,
+    "color": "orange"
+  },
+  {
+    "id": "circle_3",
+    "x": 350.5,
+    "y": 177.125,
+    "color": "orange"
+  },
+  {
+    "id": "circle_4",
+    "x": 723.5,
+    "y": 164.125,
+    "color": "orange"
+  },
+  {
+    "id": "circle_5",
+    "x": 688.5,
+    "y": 223.125,
+    "color": "orange"
+  },
+  {
+    "id": "circle_6",
+    "x": 756.5,
+    "y": 138.125,
+    "color": "orange"
+  },
+  {
+    "id": "circle_7",
+    "x": 635.5,
+    "y": 280.125,
+    "color": "orange"
+  },
+  {
+    "id": "circle_8",
+    "x": 513.5,
+    "y": 80.125,
+    "color": "orange"
+  },
+  {
+    "id": "circle_9",
+    "x": 153.5,
+    "y": 130.125,
+    "color": "orange"
+  },
+  {
+    "id": "circle_10",
+    "x": 677.5,
+    "y": 99.125,
+    "color": "orange"
+  },
+  {
+    "id": "circle_11",
+    "x": 244.5,
+    "y": 278.125,
+    "color": "orange"
+  },
+  {
+    "id": "circle_12",
+    "x": 438.5,
+    "y": 93.125
+  }
+]

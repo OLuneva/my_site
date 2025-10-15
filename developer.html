@@ -18,7 +18,7 @@
     <div id="container">
         <h1>Режим разработчика</h1>
         <div id="filters">
-            <select id="groupSelect"><option>Выберите Группу</option></select>
+            <select id="groupSelect"><option>Выберите Сорт</option></select>
             <select id="subgroupSelect"><option>Выберите Круг</option></select>
         </div>
         <div id="controls">
@@ -63,8 +63,8 @@
             } catch (e) {
                 console.warn('CSV не загружен, используем демо-данные:', e.message);
                 data = [
-                    { Группа: 'Группа1', Подгруппа: 'Подгруппа1' },
-                    { Группа: 'Группа2', Подгруппа: 'Подгруппа2' }
+                    { Сорт: 'Сорт1', Подгруппа: 'Подгруппа1' },
+                    { Сорт: 'Сорт2', Подгруппа: 'Подгруппа2' }
                 ];
                 filteredData = data;
                 updateFilters();
@@ -75,7 +75,7 @@
             const lines = csvText.split('\n').filter(line => line.trim());
             if (lines.length < 1) return [];
             const headers = lines[0].split(',').map(h => h.trim());
-            const expectedHeaders = ['Класс', 'Подкласс', 'Тип', 'Подтип', 'Группа', 'Подгруппа'];
+            const expectedHeaders = ['Класс', 'Подкласс', 'Тип', 'Подтип', 'Сорт', 'Подгруппа'];
             if (!expectedHeaders.every(h => headers.includes(h))) {
                 console.warn('Заголовки CSV не совпадают, используем демо-данные');
                 return [];
@@ -90,10 +90,10 @@
 
         function updateFilters() {
             const selects = ['groupSelect', 'subgroupSelect'];
-            const keys = ['Группа', 'Подгруппа'];
+            const keys = ['Сорт', 'Подгруппа'];
             selects.forEach((id, i) => {
                 const select = document.getElementById(id);
-                select.innerHTML = `<option>Выберите ${i === 0 ? 'Группу' : 'Круг'}</option>`;
+                select.innerHTML = `<option>Выберите ${i === 0 ? 'Сорт' : 'Круг'}</option>`;
                 if (i === 0) {
                     const unique = [...new Set(filteredData.map(d => d[keys[i]]))].filter(v => v);
                     unique.forEach(val => {
@@ -103,16 +103,17 @@
                         select.appendChild(option);
                     });
                 } else {
-                    // Для последнего фильтра: показать ID кругов, соответствующих выбранным фильтрам
-                    const matchingCircles = circles.filter(circle => {
-                        const circleType = circle.type || 'Группа1';
+                    // Для последнего фильтра: показать ID кругов, соответствующих выбранным фильтрам, без пустых и дубликатов
+                    const matchingCircles = circles.filter(c => c.id && c.id.trim() !== '').filter(circle => {
+                        const circleType = circle.type || 'Сорт1';
                         return (!selectedFilters.group || circleType.includes(selectedFilters.group)) &&
                                (!selectedFilters.subgroup || circleType.includes(selectedFilters.subgroup));
                     });
-                    matchingCircles.forEach(circle => {
+                    const uniqueIds = [...new Set(matchingCircles.map(c => c.id))];
+                    uniqueIds.forEach(id => {
                         const option = document.createElement('option');
-                        option.value = circle.id;
-                        option.textContent = circle.id;
+                        option.value = id;
+                        option.textContent = id;
                         select.appendChild(option);
                     });
                 }
@@ -120,7 +121,7 @@
         }
 
         function cascadeFilters(changedKey) {
-            const keys = ['Группа', 'Подгруппа'];
+            const keys = ['Сорт', 'Подгруппа'];
             const index = keys.indexOf(changedKey);
             filteredData = data.filter(d => {
                 return keys.slice(0, index + 1).every(key => !selectedFilters[key.toLowerCase()] || d[key] === selectedFilters[key.toLowerCase()]);
@@ -129,7 +130,7 @@
         }
 
         // Обработчики фильтров
-        document.getElementById('groupSelect').addEventListener('change', e => { selectedFilters.group = e.target.value; cascadeFilters('Группа'); });
+        document.getElementById('groupSelect').addEventListener('change', e => { selectedFilters.group = e.target.value; cascadeFilters('Сорт'); });
         document.getElementById('subgroupSelect').addEventListener('change', e => { selectedFilters.subgroup = e.target.value; cascadeFilters('Подгруппа'); });
 
         function renderCircles() {
@@ -138,13 +139,11 @@
             circles.forEach(circle => {
                 if (!circle || !circle.id) return;
                 ctx.beginPath();
-                ctx.arc(circle.x, circle.y, 20, 0, 2 * Math.PI);
+                ctx.arc(circle.x, circle.y, 15, 0, 2 * Math.PI); // Уменьшен радиус до 15
                 ctx.fillStyle = newCircles.has(circle.id) ? 'red' : 'orange'; // Новые красные, старые оранжевые
                 ctx.fill();
                 ctx.stroke();
-                ctx.fillStyle = 'white';
-                ctx.font = '12px Arial';
-                ctx.fillText(circle.id, circle.x - 15, circle.y + 5);
+                // Убрана подпись: ctx.fillText(circle.id, circle.x - 15, circle.y + 5);
             });
         }
 
@@ -153,7 +152,14 @@
         }
 
         function generateId() {
-            return 'circle_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            // Найти все существующие ID, извлечь номера, найти max
+            const existingIds = circles.map(c => c.id).filter(id => id && id.startsWith('circle_'));
+            let maxNum = 0;
+            existingIds.forEach(id => {
+                const num = parseInt(id.replace('circle_', ''));
+                if (!isNaN(num) && num > maxNum) maxNum = num;
+            });
+            return 'circle_' + (maxNum + 1);
         }
 
         // Добавление круга
@@ -195,7 +201,7 @@
             const rect = canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
-            draggedCircle = circles.find(c => Math.sqrt((c.x - x) ** 2 + (c.y - y) ** 2) < 20);
+            draggedCircle = circles.find(c => Math.sqrt((c.x - x) ** 2 + (c.y - y) ** 2) < 15); // Радиус 15
         });
 
         canvas.addEventListener('mousemove', e => {
@@ -236,8 +242,16 @@
                 const reader = new FileReader();
                 reader.onload = () => {
                     try {
-                        circles = JSON.parse(reader.result);
-                        circles = circles.filter(circle => circle && typeof circle.id === 'string' && circle.id.trim() !== '' && typeof circle.x === 'number' && typeof circle.y === 'number');
+                        let imported = JSON.parse(reader.result);
+                        imported = imported.filter(circle => circle && typeof circle.id === 'string' && circle.id.trim() !== '' && typeof circle.x === 'number' && typeof circle.y === 'number');
+                        // Убрать дубликаты ID и перенумеровать
+                        const uniqueIds = new Set();
+                        circles = imported.filter(circle => {
+                            if (uniqueIds.has(circle.id)) return false;
+                            uniqueIds.add(circle.id);
+                            return true;
+                        });
+                        // Если нужно, перенумеровать (но пока оставим как есть, если ID корректные)
                         saveCircles();
                         renderCircles();
                         updateFilters();

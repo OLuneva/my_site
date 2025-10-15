@@ -35,8 +35,6 @@
     </div>
 
     <script>
-        alert('Скрипт загружен'); // Отладка
-
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         const background = new Image();
@@ -60,9 +58,7 @@
                     ...c,
                     id: String(c.id || '') // Конвертируем id в строку
                 }));
-                alert('Круги загружены: ' + circles.length + ' кругов');
             } catch (e) {
-                alert('Ошибка загрузки кругов, используем пустой массив: ' + e.message);
                 circles = [];
             }
             renderCircles();
@@ -80,10 +76,8 @@
                 data = parseCSV(csvText);
                 if (data.length === 0) throw new Error('CSV пустой или некорректный');
                 filteredData = data;
-                alert('CSV загружен успешно: ' + data.length + ' строк');
                 updateFilters();
             } catch (e) {
-                alert('CSV не загружен, используем демо-данные: ' + e.message);
                 data = [
                     { Сорт: 'Сорт1', Подгруппа: 'Подгруппа1' },
                     { Сорт: 'Сорт2', Подгруппа: 'Подгруппа2' }
@@ -99,7 +93,6 @@
             const headers = lines[0].split(',').map(h => h.trim());
             const expectedHeaders = ['Класс', 'Подкласс', 'Тип', 'Подтип', 'Сорт', 'Подгруппа'];
             if (!expectedHeaders.every(h => headers.includes(h))) {
-                alert('Заголовки CSV не совпадают, используем демо-данные');
                 return [];
             }
             return lines.slice(1).map(line => {
@@ -184,11 +177,9 @@
             newCircles.add(id);
             renderCircles();
             updateFilters();
-            alert('Круг добавлен: ' + id + ' в позиции ' + x + ' ' + y + ' (не сохранено, экспортируйте)');
         }
 
         document.getElementById('addCircleBtn').addEventListener('click', () => {
-            alert('Кнопка "Добавить круг" нажата');
             const x = canvas.width / 2;
             const y = canvas.height / 2;
             addCircleAtPosition(x, y);
@@ -200,9 +191,6 @@
                 newCircles.delete(removed.id);
                 renderCircles();
                 updateFilters();
-                alert('Круг удален: ' + removed.id + ' (не сохранено, экспортируйте)');
-            } else {
-                alert('Нет кругов для удаления');
             }
         });
 
@@ -220,9 +208,6 @@
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
             draggedCircle = getCircleAt(x, y);
-            if (draggedCircle) {
-                alert('Круг захвачен: ' + draggedCircle.id);
-            }
         });
 
         canvas.addEventListener('mousemove', (e) => {
@@ -235,10 +220,7 @@
         });
 
         canvas.addEventListener('mouseup', () => {
-            if (draggedCircle) {
-                alert('Круг перемещен: ' + draggedCircle.id + ' (не сохранено, экспортируйте)');
-                draggedCircle = null;
-            }
+            draggedCircle = null;
         });
 
         document.addEventListener('keydown', (e) => {
@@ -252,13 +234,11 @@
                     newCircles.delete(circleToDelete.id);
                     renderCircles();
                     updateFilters();
-                    alert('Круг удален по Delete: ' + circleToDelete.id + ' (не сохранено, экспортируйте)');
                 }
             }
         });
 
         background.onload = () => {
-            alert('Фон загружен');
             renderCircles();
         };
 
@@ -268,7 +248,7 @@
 
         // Кнопка "Сохранить изменения" — напоминание экспортировать
         document.getElementById('saveChangesBtn').addEventListener('click', () => {
-            alert('Изменения не сохранены автоматически. Нажмите "Экспорт JSON" для скачивания файла и загрузите его в репозиторий вручную.');
+            // Можно добавить сообщение в консоль, если нужно: console.log('Изменения не сохранены автоматически. Нажмите "Экспорт JSON" для скачивания файла и загрузите его в репозиторий вручную.');
         });
 
         // Экспорт JSON
@@ -281,7 +261,6 @@
             a.download = 'circles_export.json';
             a.click();
             URL.revokeObjectURL(url);
-            alert('JSON экспортирован');
         });
 
         // Импорт JSON
@@ -301,9 +280,8 @@
                         }));
                         renderCircles();
                         updateFilters();
-                        alert('JSON импортирован');
                     } catch (err) {
-                        alert('Ошибка импорта: ' + err.message);
+                        // Можно добавить console.log для ошибок: console.log('Ошибка импорта: ' + err.message);
                     }
                 };
                 reader.readAsText(file);

@@ -46,7 +46,7 @@
         let data = []; // Данные из CSV
         let filteredData = [];
         let selectedFilters = { group: '', subgroup: '' };
-        let draggedCircle = null;
+        let draggedCircle = null; // Для перетаскивания
         let newCircles = new Set(); // Для отслеживания новых кругов (красные)
 
         // Функция загрузки CSV (асинхронно)
@@ -181,6 +181,75 @@
             const x = canvas.width / 2;
             const y = canvas.height / 2;
             addCircleAtPosition(x, y);
+        });
+
+        // Обработчик для кнопки "Удалить круг" - удаляет последний круг
+        document.getElementById('removeCircleBtn').addEventListener('click', () => {
+            if (circles.length > 0) {
+                const removed = circles.pop();
+                newCircles.delete(removed.id); // Удалить из новых, если был
+                saveCircles();
+                renderCircles();
+                updateFilters();
+                console.log('Круг удален:', removed.id);
+            } else {
+                alert('Нет кругов для удаления');
+            }
+        });
+
+        // Функция для получения круга под курсором
+        function getCircleAt(x, y) {
+            return circles.find(circle => {
+                const dx = x - circle.x;
+                const dy = y - circle.y;
+                return Math.sqrt(dx * dx + dy * dy) < 15; // Радиус 15
+            });
+        }
+
+        // Обработчики мыши для перетаскивания
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            draggedCircle = getCircleAt(x, y);
+            if (draggedCircle) {
+                console.log('Круг захвачен для перетаскивания:', draggedCircle.id);
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (draggedCircle) {
+                const rect = canvas.getBoundingClientRect();
+                draggedCircle.x = e.clientX - rect.left;
+                draggedCircle.y = e.clientY - rect.top;
+                renderCircles();
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            if (draggedCircle) {
+                saveCircles(); // Сохранить после перемещения
+                console.log('Круг перемещен и сохранен:', draggedCircle.id);
+                draggedCircle = null;
+            }
+        });
+
+        // Обработчик клавиши Delete для удаления круга под курсором
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Delete') {
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const circleToDelete = getCircleAt(x, y);
+                if (circleToDelete) {
+                    circles = circles.filter(c => c !== circleToDelete);
+                    newCircles.delete(circleToDelete.id);
+                    saveCircles();
+                    renderCircles();
+                    updateFilters();
+                    console.log('Круг удален по Delete:', circleToDelete.id);
+                }
+            }
         });
 
         // Загрузка фона и начальный рендер

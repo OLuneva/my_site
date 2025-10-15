@@ -24,6 +24,7 @@
         <div id="controls">
             <button id="addCircleBtn">Добавить круг</button>
             <button id="removeCircleBtn">Удалить круг</button>
+            <button id="saveChangesBtn">Сохранить изменения</button>
             <button id="exportBtn">Экспорт JSON</button>
             <input type="file" id="importInput" accept=".json" style="display: none;">
             <button id="importBtn">Импорт JSON</button>
@@ -194,6 +195,13 @@
                 renderCircles();
                 updateFilters();
             }
+        });
+
+        // Кнопка "Сохранить изменения"
+        document.getElementById('saveChangesBtn').addEventListener('click', () => {
+            saveCircles();
+            document.getElementById('status').textContent = 'Изменения сохранены!';
+            setTimeout(() => document.getElementById('status').textContent = 'Наведите курсор на круг и нажмите Delete для удаления. Перетаскивайте для перемещения.', 2000);
         });
 
         // Drag and drop

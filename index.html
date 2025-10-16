@@ -19,12 +19,12 @@
     <div id="container">
         <h1>Пользовательский режим</h1>
         <div id="filters">
-            <select id="classSelect"><option>Выберите Класс</option></select>
-            <select id="subclassSelect"><option>Выберите Семейство</option></select>
-            <select id="typeSelect"><option>Выберите Род</option></select>
-            <select id="subtypeSelect"><option>Выберите Вид</option></select>
-            <select id="groupSelect"><option>Выберите Сорт</option></select>
-            <select id="subgroupSelect"><option>Выберите Круг</option></select> <!-- Скрыт -->
+            <select id="classSelect"><option>Не выбрано</option></select>
+            <select id="subclassSelect"><option>Не выбрано</option></select>
+            <select id="typeSelect"><option>Не выбрано</option></select>
+            <select id="subtypeSelect"><option>Не выбрано</option></select>
+            <select id="groupSelect"><option>Не выбрано</option></select>
+            <select id="subgroupSelect"><option>Не выбрано</option></select> <!-- Скрыт -->
         </div>
         <div id="controls">
             <button id="findPlantBtn">Найти растение</button>
@@ -123,85 +123,82 @@
             const typeSelect = document.getElementById('typeSelect');
             const subtypeSelect = document.getElementById('subtypeSelect');
             const groupSelect = document.getElementById('groupSelect');
-            // subgroupSelect скрыт и не используется
+            // subgroupSelect скрыт
 
-            // Класс
-            const classes = [...new Set(data.map(d => d.class))].sort();
-            classSelect.innerHTML = '<option>Выберите Класс</option>' + classes.map(c => `<option value="${c}">${c}</option>`).join('');
+            // Функция для обновления всех фильтров на основе текущих selectedFilters
+            function updateAllFilters() {
+                // Фильтруем данные на основе выбранных фильтров (только если выбрано что-то кроме пустой строки)
+                const filteredData = data.filter(d => {
+                    return (!selectedFilters.class || d.class === selectedFilters.class) &&
+                           (!selectedFilters.subclass || d.subclass === selectedFilters.subclass) &&
+                           (!selectedFilters.type || d.type === selectedFilters.type) &&
+                           (!selectedFilters.subtype || d.subtype === selectedFilters.subtype) &&
+                           (!selectedFilters.group || d.group === selectedFilters.group);
+                });
 
+                // Обновляем каждый селект
+                const classes = [...new Set(filteredData.map(d => d.class))].sort();
+                classSelect.innerHTML = '<option value="">Не выбрано</option>' + classes.map(c => `<option value="${c}">${c}</option>`).join('');
+                classSelect.value = selectedFilters.class;
+
+                const subclasses = [...new Set(filteredData.map(d => d.subclass))].sort();
+                subclassSelect.innerHTML = '<option value="">Не выбрано</option>' + subclasses.map(c => `<option value="${c}">${c}</option>`).join('');
+                subclassSelect.value = selectedFilters.subclass;
+
+                const types = [...new Set(filteredData.map(d => d.type))].sort();
+                typeSelect.innerHTML = '<option value="">Не выбрано</option>' + types.map(c => `<option value="${c}">${c}</option>`).join('');
+                typeSelect.value = selectedFilters.type;
+
+                const subtypes = [...new Set(filteredData.map(d => d.subtype))].sort();
+                subtypeSelect.innerHTML = '<option value="">Не выбрано</option>' + subtypes.map(c => `<option value="${c}">${c}</option>`).join('');
+                subtypeSelect.value = selectedFilters.subtype;
+
+                const groups = [...new Set(filteredData.map(d => d.group))].sort();
+                groupSelect.innerHTML = '<option value="">Не выбрано</option>' + groups.map(c => `<option value="${c}">${c}</option>`).join('');
+                groupSelect.value = selectedFilters.group;
+            }
+
+            // Изначально все фильтры на "Не выбрано", показываем все
+            updateAllFilters();
+
+            // Обработчики изменений для каждого селекта
             classSelect.addEventListener('change', () => {
                 selectedFilters.class = classSelect.value;
-                selectedFilters.subclass = '';
-                selectedFilters.type = '';
-                selectedFilters.subtype = '';
-                selectedFilters.group = '';
-                selectedFilters.subgroup = '';
-                updateSubclass();
+                updateAllFilters();
             });
-
-            function updateSubclass() {
-                const subclasses = [...new Set(data.filter(d => !selectedFilters.class || d.class === selectedFilters.class).map(d => d.subclass))].sort();
-                subclassSelect.innerHTML = '<option>Выберите Семейство</option>' + subclasses.map(c => `<option value="${c}">${c}</option>`).join('');
-                subclassSelect.disabled = subclasses.length === 0;
-                updateType();
-            }
 
             subclassSelect.addEventListener('change', () => {
                 selectedFilters.subclass = subclassSelect.value;
-                selectedFilters.type = '';
-                selectedFilters.subtype = '';
-                selectedFilters.group = '';
-                selectedFilters.subgroup = '';
-                updateType();
+                updateAllFilters();
             });
-
-            function updateType() {
-                const types = [...new Set(data.filter(d => (!selectedFilters.class || d.class === selectedFilters.class) && (!selectedFilters.subclass || d.subclass === selectedFilters.subclass)).map(d => d.type))].sort();
-                typeSelect.innerHTML = '<option>Выберите Род</option>' + types.map(c => `<option value="${c}">${c}</option>`).join('');
-                typeSelect.disabled = types.length === 0;
-                updateSubtype();
-            }
 
             typeSelect.addEventListener('change', () => {
                 selectedFilters.type = typeSelect.value;
-                selectedFilters.subtype = '';
-                selectedFilters.group = '';
-                selectedFilters.subgroup = '';
-                updateSubtype();
+                updateAllFilters();
             });
-
-            function updateSubtype() {
-                const subtypes = [...new Set(data.filter(d => (!selectedFilters.class || d.class === selectedFilters.class) && (!selectedFilters.subclass || d.subclass === selectedFilters.subclass) && (!selectedFilters.type || d.type === selectedFilters.type)).map(d => d.subtype))].sort();
-                subtypeSelect.innerHTML = '<option>Выберите Вид</option>' + subtypes.map(c => `<option value="${c}">${c}</option>`).join('');
-                subtypeSelect.disabled = subtypes.length === 0;
-                updateGroup();
-            }
 
             subtypeSelect.addEventListener('change', () => {
                 selectedFilters.subtype = subtypeSelect.value;
-                selectedFilters.group = '';
-                selectedFilters.subgroup = '';
-                updateGroup();
+                updateAllFilters();
             });
-
-            function updateGroup() {
-                const groups = [...new Set(data.filter(d => (!selectedFilters.class || d.class === selectedFilters.class) && (!selectedFilters.subclass || d.subclass === selectedFilters.subclass) && (!selectedFilters.type || d.type === selectedFilters.type) && (!selectedFilters.subtype || d.subtype === selectedFilters.subtype)).map(d => d.group))].sort();
-                groupSelect.innerHTML = '<option>Выберите Сорт</option>' + groups.map(c => `<option value="${c}">${c}</option>`).join('');
-                groupSelect.disabled = groups.length === 0;
-            }
 
             groupSelect.addEventListener('change', () => {
                 selectedFilters.group = groupSelect.value;
-                selectedFilters.subgroup = '';
                 // Автоматически определить subgroup (Круг) по выбранному Сорту
-                const matching = data.filter(d => d.class === selectedFilters.class && d.subclass === selectedFilters.subclass && d.type === selectedFilters.type && d.subtype === selectedFilters.subtype && d.group === selectedFilters.group);
+                const matching = data.filter(d => d.group === selectedFilters.group &&
+                                                   (!selectedFilters.class || d.class === selectedFilters.class) &&
+                                                   (!selectedFilters.subclass || d.subclass === selectedFilters.subclass) &&
+                                                   (!selectedFilters.type || d.type === selectedFilters.type) &&
+                                                   (!selectedFilters.subtype || d.subtype === selectedFilters.subtype));
                 if (matching.length > 0) {
                     // Предполагаем однозначное соответствие, берем первый (или единственный)
                     selectedFilters.subgroup = matching[0].subgroup;
                     console.log('Определен Круг:', selectedFilters.subgroup);
                 } else {
+                    selectedFilters.subgroup = '';
                     console.warn('Не найден соответствующий Круг для выбранного Сорта');
                 }
+                updateAllFilters(); // Хотя group уже выбран, обновляем на всякий случай
             });
         }
 

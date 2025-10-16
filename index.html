@@ -8,7 +8,7 @@
         #container { display: flex; flex-direction: column; align-items: center; }
         #filters { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
         select { padding: 5px; }
-        #subgroupSelect { display: none; } /* Скрываем селектор Круга */
+        #subgroupSelect { display: none; } /* Скрываем селектор Круга по умолчанию */
         #controls { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
         button { padding: 10px; }
         #canvas { border: 1px solid #000; }
@@ -17,14 +17,14 @@
 </head>
 <body>
     <div id="container">
-        <h1>Пользовательский режим</h1>
+        <h1 id="modeTitle">Пользовательский режим</h1>
         <div id="filters">
             <select id="classSelect"><option>Не выбрано</option></select>
             <select id="subclassSelect"><option>Не выбрано</option></select>
             <select id="typeSelect"><option>Не выбрано</option></select>
             <select id="subtypeSelect"><option>Не выбрано</option></select>
             <select id="groupSelect"><option>Не выбрано</option></select>
-            <select id="subgroupSelect"><option>Не выбрано</option></select> <!-- Скрыт -->
+            <select id="subgroupSelect"><option>Не выбрано</option></select> <!-- Скрыт в пользовательском режиме -->
         </div>
         <div id="controls">
             <button id="findPlantBtn">Найти растение</button>
@@ -47,6 +47,7 @@
         let blinkInterval = null;
         let isBlinking = false;
         let csvLoaded = false;
+        let isDeveloperMode = false; // Флаг режима
 
         // Функция загрузки кругов из circles_export.json
         async function loadCircles() {
@@ -123,7 +124,7 @@
             const typeSelect = document.getElementById('typeSelect');
             const subtypeSelect = document.getElementById('subtypeSelect');
             const groupSelect = document.getElementById('groupSelect');
-            // subgroupSelect скрыт
+            const subgroupSelect = document.getElementById('subgroupSelect');
 
             // Функция для обновления всех фильтров на основе текущих selectedFilters
             function updateAllFilters() {
@@ -133,7 +134,8 @@
                            (!selectedFilters.subclass || d.subclass === selectedFilters.subclass) &&
                            (!selectedFilters.type || d.type === selectedFilters.type) &&
                            (!selectedFilters.subtype || d.subtype === selectedFilters.subtype) &&
-                           (!selectedFilters.group || d.group === selectedFilters.group);
+                           (!selectedFilters.group || d.group === selectedFilters.group) &&
+                           (!selectedFilters.subgroup || d.subgroup === selectedFilters.subgroup);
                 });
 
                 // Обновляем каждый селект
@@ -156,6 +158,10 @@
                 const groups = [...new Set(filteredData.map(d => d.group))].sort();
                 groupSelect.innerHTML = '<option value="">Не выбрано</option>' + groups.map(c => `<option value="${c}">${c}</option>`).join('');
                 groupSelect.value = selectedFilters.group;
+
+                const subgroups = [...new Set(filteredData.map(d => d.subgroup))].sort();
+                subgroupSelect.innerHTML = '<option value="">Не выбрано</option>' + subgroups.map(c => `<option value="${c}">${c}</option>`).join('');
+                subgroupSelect.value = selectedFilters.subgroup;
             }
 
             // Изначально все фильтры на "Не выбрано", показываем все
@@ -184,21 +190,12 @@
 
             groupSelect.addEventListener('change', () => {
                 selectedFilters.group = groupSelect.value;
-                // Автоматически определить subgroup (Круг) по выбранному Сорту
-                const matching = data.filter(d => d.group === selectedFilters.group &&
-                                                   (!selectedFilters.class || d.class === selectedFilters.class) &&
-                                                   (!selectedFilters.subclass || d.subclass === selectedFilters.subclass) &&
-                                                   (!selectedFilters.type || d.type === selectedFilters.type) &&
-                                                   (!selectedFilters.subtype || d.subtype === selectedFilters.subtype));
-                if (matching.length > 0) {
-                    // Предполагаем однозначное соответствие, берем первый (или единственный)
-                    selectedFilters.subgroup = matching[0].subgroup;
-                    console.log('Определен Круг:', selectedFilters.subgroup);
-                } else {
-                    selectedFilters.subgroup = '';
-                    console.warn('Не найден соответствующий Круг для выбранного Сорта');
-                }
-                updateAllFilters(); // Хотя group уже выбран, обновляем на всякий случай
+                updateAllFilters();
+            });
+
+            subgroupSelect.addEventListener('change', () => {
+                selectedFilters.subgroup = subgroupSelect.value;
+                updateAllFilters();
             });
         }
 
@@ -261,20 +258,31 @@
 
         // Кнопка "Найти растение"
         document.getElementById('findPlantBtn').addEventListener('click', () => {
-            if (!selectedFilters.group) {
-                document.getElementById('status').textContent = 'Сначала выберите Сорт в фильтре.';
-                return;
-            }
             if (!selectedFilters.subgroup) {
-                document.getElementById('status').textContent = 'Круг не определен для выбранного Сорта.';
+                document.getElementById('status').textContent = 'Сначала выберите Круг в фильтре.';
                 return;
             }
             blinkCircle(selectedFilters.subgroup);
         });
 
-        // Кнопка перехода в режим разработчика (заглушка)
+        // Кнопка перехода в режим разработчика
         document.getElementById('switchToDeveloperBtn').addEventListener('click', () => {
-            alert('Переход в режим разработчика (не реализовано)');
+            isDeveloperMode = !isDeveloperMode;
+            const modeTitle = document.getElementById('modeTitle');
+            const subgroupSelect = document.getElementById('subgroupSelect');
+            const switchBtn = document.getElementById('switchToDeveloperBtn');
+
+            if (isDeveloperMode) {
+                modeTitle.textContent = 'Режим разработчика';
+                subgroupSelect.style.display = 'block'; // Показываем селектор Круга
+                switchBtn.textContent = 'Перейти в пользовательский режим';
+                document.getElementById('status').textContent = 'Режим разработчика активирован. Теперь доступен селектор Круга.';
+            } else {
+                modeTitle.textContent = 'Пользовательский режим';
+                subgroupSelect.style.display = 'none'; // Скрываем селектор Круга
+                switchBtn.textContent = 'Перейти в режим разработчика';
+                document.getElementById('status').textContent = 'Переключено в пользовательский режим.';
+            }
         });
     </script>
 </body>

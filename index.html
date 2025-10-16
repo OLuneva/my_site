@@ -41,11 +41,11 @@
 
         let circles = [];
         let data = [];
-        let filteredData = [];
         let selectedFilters = { class: '', subclass: '', type: '', subtype: '', group: '', subgroup: '' };
         let blinkingCircleId = null;
         let blinkInterval = null;
         let isBlinking = false;
+        let csvLoaded = false;
 
         // Функция загрузки кругов из circles_export.json
         async function loadCircles() {
@@ -88,12 +88,10 @@
                 if (headers.length !== 6 || !headers.includes('Класс') || !headers.includes('Подгруппа')) {
                     throw new Error('Заголовки CSV не соответствуют ожидаемым: ["Класс", "Подкласс", "Тип", "Подтип", "Группа", "Подгруппа"]');
                 }
+
                 data = rows.slice(1).map(row => {
                     const cells = row.split(';').map(cell => cell.replace(/^"|"$/g, '').trim());
-                    if (cells.length !== 6) {
-                        console.warn('Строка с неправильным количеством столбцов:', row);
-                        return null;
-                    }
+                    if (cells.length !== 6) return null;
                     return {
                         class: cells[0],
                         subclass: cells[1],
@@ -102,21 +100,18 @@
                         group: cells[4],
                         subgroup: cells[5]
                     };
-                }).filter(item => item && item.subgroup);  // Убираем пустые строки
-                if (data.length === 0) throw new Error('Парсинг дал пустой массив данных');
+                }).filter(item => item && item.class && item.subgroup);
                 console.log('Данные загружены из CSV:', data.length, 'записей');
-                filteredData = [...data];
-                populateFilters();
-                document.getElementById('status').textContent = `Загружено ${data.length} записей из CSV.`;
+                csvLoaded = true;
+                document.getElementById('status').textContent += ' Данные фильтров загружены.';
             } catch (e) {
-                console.error('Ошибка загрузки/парсинга CSV:', e.message);
+                console.warn('Ошибка загрузки/парсинга CSV, используем демо-данные для фильтров:', e.message);
                 data = [
                     { class: 'Класс1', subclass: 'Подкласс1', type: 'Тип1', subtype: 'Подтип1', group: 'Группа1', subgroup: 'Подгруппа1' },
-                    { class: 'Класс2', subclass: 'Подкласс2', type: 'Тип2', subtype: 'Подтип2', group: 'Группа2', subgroup: 'Подгруппа2' }
+                    { class: 'Класс1', subclass: 'Подкласс1', type: 'Тип1', subtype: 'Подтип1', group: 'Группа1', subgroup: 'Подгруппа2' },
+                    { class: 'Класс2', subclass: 'Подкласс2', type: 'Тип2', subtype: 'Подтип2', group: 'Группа2', subgroup: 'Подгруппа3' }
                 ];
-                filteredData = [...data];
-                populateFilters();
-                document.getElementById('status').textContent = 'Используются демо-данные. Проверьте консоль для деталей ошибки.';
+                document.getElementById('status').textContent += ' Используются демо-данные для фильтров.';
             }
         }
 
@@ -130,196 +125,161 @@
             const subgroupSelect = document.getElementById('subgroupSelect');
 
             // Класс
-            classSelect.innerHTML = '<option>Выберите Класс</option>';
-            const classes = [...new Set(filteredData.map(item => item.class))].sort();
-            classes.forEach(cls => {
-                const option = document.createElement('option');
-                option.value = cls;
-                option.textContent = cls;
-                classSelect.appendChild(option);
+            const classes = [...new Set(data.map(d => d.class))].sort();
+            classSelect.innerHTML = '<option>Выберите Класс</option>' + classes.map(c => `<option value="${c}">${c}</option>`).join('');
+
+            classSelect.addEventListener('change', () => {
+                selectedFilters.class = classSelect.value;
+                selectedFilters.subclass = '';
+                selectedFilters.type = '';
+                selectedFilters.subtype = '';
+                selectedFilters.group = '';
+                selectedFilters.subgroup = '';
+                updateSubclass();
             });
 
-            // Подкласс (фильтруется по классу)
-            subclassSelect.innerHTML = '<option>Выберите Подкласс</option>';
-            if (selectedFilters.class) {
-                const subclasses = [...new Set(filteredData.filter(item => item.class === selectedFilters.class).map(item => item.subclass))].sort();
-                subclasses.forEach(sub => {
-                    const option = document.createElement('option');
-                    option.value = sub;
-                    option.textContent = sub;
-                    subclassSelect.appendChild(option);
-                });
+            function updateSubclass() {
+                const subclasses = [...new Set(data.filter(d => !selectedFilters.class || d.class === selectedFilters.class).map(d => d.subclass))].sort();
+                subclassSelect.innerHTML = '<option>Выберите Подкласс</option>' + subclasses.map(c => `<option value="${c}">${c}</option>`).join('');
+                subclassSelect.disabled = subclasses.length === 0;
+                updateType();
             }
 
-            // Тип (фильтруется по подклассу)
-            typeSelect.innerHTML = '<option>Выберите Тип</option>';
-            if (selectedFilters.subclass) {
-                const types = [...new Set(filteredData.filter(item => item.subclass === selectedFilters.subclass).map(item => item.type))].sort();
-                types.forEach(typ => {
-                    const option = document.createElement('option');
-                    option.value = typ;
-                    option.textContent = typ;
-                    typeSelect.appendChild(option);
-                });
+            subclassSelect.addEventListener('change', () => {
+                selectedFilters.subclass = subclassSelect.value;
+                selectedFilters.type = '';
+                selectedFilters.subtype = '';
+                selectedFilters.group = '';
+                selectedFilters.subgroup = '';
+                updateType();
+            });
+
+            function updateType() {
+                const types = [...new Set(data.filter(d => (!selectedFilters.class || d.class === selectedFilters.class) && (!selectedFilters.subclass || d.subclass === selectedFilters.subclass)).map(d => d.type))].sort();
+                typeSelect.innerHTML = '<option>Выберите Тип</option>' + types.map(c => `<option value="${c}">${c}</option>`).join('');
+                typeSelect.disabled = types.length === 0;
+                updateSubtype();
             }
 
-            // Подтип (фильтруется по типу)
-            subtypeSelect.innerHTML = '<option>Выберите Подтип</option>';
-            if (selectedFilters.type) {
-                const subtypes = [...new Set(filteredData.filter(item => item.type === selectedFilters.type).map(item => item.subtype))].sort();
-                subtypes.forEach(subt => {
-                    const option = document.createElement('option');
-                    option.value = subt;
-                    option.textContent = subt;
-                    subtypeSelect.appendChild(option);
-                });
+            typeSelect.addEventListener('change', () => {
+                selectedFilters.type = typeSelect.value;
+                selectedFilters.subtype = '';
+                selectedFilters.group = '';
+                selectedFilters.subgroup = '';
+                updateSubtype();
+            });
+
+            function updateSubtype() {
+                const subtypes = [...new Set(data.filter(d => (!selectedFilters.class || d.class === selectedFilters.class) && (!selectedFilters.subclass || d.subclass === selectedFilters.subclass) && (!selectedFilters.type || d.type === selectedFilters.type)).map(d => d.subtype))].sort();
+                subtypeSelect.innerHTML = '<option>Выберите Подтип</option>' + subtypes.map(c => `<option value="${c}">${c}</option>`).join('');
+                subtypeSelect.disabled = subtypes.length === 0;
+                updateGroup();
             }
 
-            // Группа (фильтруется по подтипу)
-            groupSelect.innerHTML = '<option>Выберите Группу</option>';
-            if (selectedFilters.subtype) {
-                const groups = [...new Set(filteredData.filter(item => item.subtype === selectedFilters.subtype).map(item => item.group))].sort();
-                groups.forEach(grp => {
-                    const option = document.createElement('option');
-                    option.value = grp;
-                    option.textContent = grp;
-                    groupSelect.appendChild(option);
-                });
+            subtypeSelect.addEventListener('change', () => {
+                selectedFilters.subtype = subtypeSelect.value;
+                selectedFilters.group = '';
+                selectedFilters.subgroup = '';
+                updateGroup();
+            });
+
+            function updateGroup() {
+                const groups = [...new Set(data.filter(d => (!selectedFilters.class || d.class === selectedFilters.class) && (!selectedFilters.subclass || d.subclass === selectedFilters.subclass) && (!selectedFilters.type || d.type === selectedFilters.type) && (!selectedFilters.subtype || d.subtype === selectedFilters.subtype)).map(d => d.group))].sort();
+                groupSelect.innerHTML = '<option>Выберите Группу</option>' + groups.map(c => `<option value="${c}">${c}</option>`).join('');
+                groupSelect.disabled = groups.length === 0;
+                updateSubgroup();
             }
 
-            // Подгруппа (фильтруется по группе)
-            subgroupSelect.innerHTML = '<option>Выберите Круг</option>';
-            if (selectedFilters.group) {
-                const subgroups = [...new Set(filteredData.filter(item => item.group === selectedFilters.group).map(item => item.subgroup))].sort();
-                subgroups.forEach(subg => {
-                    const option = document.createElement('option');
-                    option.value = subg;
-                    option.textContent = subg;
-                    subgroupSelect.appendChild(option);
-                });
+            groupSelect.addEventListener('change', () => {
+                selectedFilters.group = groupSelect.value;
+                selectedFilters.subgroup = '';
+                updateSubgroup();
+            });
+
+            function updateSubgroup() {
+                const subgroups = [...new Set(data.filter(d => (!selectedFilters.class || d.class === selectedFilters.class) && (!selectedFilters.subclass || d.subclass === selectedFilters.subclass) && (!selectedFilters.type || d.type === selectedFilters.type) && (!selectedFilters.subtype || d.subtype === selectedFilters.subtype) && (!selectedFilters.group || d.group === selectedFilters.group)).map(d => d.subgroup))].sort();
+                subgroupSelect.innerHTML = '<option>Выберите Круг</option>' + subgroups.map(c => `<option value="${c}">${c}</option>`).join('');
+                subgroupSelect.disabled = subgroups.length === 0;
             }
-        }
 
-        // Обработчики изменения фильтров
-        document.getElementById('classSelect').addEventListener('change', function() {
-            selectedFilters.class = this.value;
-            selectedFilters.subclass = '';
-            selectedFilters.type = '';
-            selectedFilters.subtype = '';
-            selectedFilters.group = '';
-            selectedFilters.subgroup = '';
-            filterData();
-            populateFilters();
-            drawCircles();
-        });
-
-        document.getElementById('subclassSelect').addEventListener('change', function() {
-            selectedFilters.subclass = this.value;
-            selectedFilters.type = '';
-            selectedFilters.subtype = '';
-            selectedFilters.group = '';
-            selectedFilters.subgroup = '';
-            filterData();
-            populateFilters();
-            drawCircles();
-        });
-
-        document.getElementById('typeSelect').addEventListener('change', function() {
-            selectedFilters.type = this.value;
-            selectedFilters.subtype = '';
-            selectedFilters.group = '';
-            selectedFilters.subgroup = '';
-            filterData();
-            populateFilters();
-            drawCircles();
-        });
-
-        document.getElementById('subtypeSelect').addEventListener('change', function() {
-            selectedFilters.subtype = this.value;
-            selectedFilters.group = '';
-            selectedFilters.subgroup = '';
-            filterData();
-            populateFilters();
-            drawCircles();
-        });
-
-        document.getElementById('groupSelect').addEventListener('change', function() {
-            selectedFilters.group = this.value;
-            selectedFilters.subgroup = '';
-            filterData();
-            populateFilters();
-            drawCircles();
-        });
-
-        document.getElementById('subgroupSelect').addEventListener('change', function() {
-            selectedFilters.subgroup = this.value;
-            filterData();
-            drawCircles();
-        });
-
-        // Фильтрация данных
-        function filterData() {
-            filteredData = data.filter(item => {
-                return (!selectedFilters.class || item.class === selectedFilters.class) &&
-                       (!selectedFilters.subclass || item.subclass === selectedFilters.subclass) &&
-                       (!selectedFilters.type || item.type === selectedFilters.type) &&
-                       (!selectedFilters.subtype || item.subtype === selectedFilters.subtype) &&
-                       (!selectedFilters.group || item.group === selectedFilters.group) &&
-                       (!selectedFilters.subgroup || item.subgroup === selectedFilters.subgroup);
+            subgroupSelect.addEventListener('change', () => {
+                selectedFilters.subgroup = subgroupSelect.value;
             });
         }
 
-        // Рисование кругов
+        // Рендеринг кругов (всегда отображаются)
         function drawCircles() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             if (background.complete) {
                 ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
             }
-            const visibleSubgroups = [...new Set(filteredData.map(item => item.subgroup))];
             circles.forEach(circle => {
-                if (visibleSubgroups.includes(circle.id)) {
-                    ctx.beginPath();
-                    ctx.arc(circle.x, circle.y, 20, 0, 2 * Math.PI);
-                    ctx.fillStyle = (blinkingCircleId === circle.id && isBlinking) ? 'red' : 'blue';
-                    ctx.fill();
-                    ctx.stroke();
-                    ctx.fillStyle = 'white';
-                    ctx.fillText(circle.id, circle.x - 10, circle.y + 5);
+                ctx.beginPath();
+                ctx.arc(circle.x, circle.y, 20, 0, 2 * Math.PI);
+                if (isBlinking && blinkingCircleId === circle.id) {
+                    ctx.fillStyle = 'red';
+                } else {
+                    ctx.fillStyle = 'rgba(0, 128, 0, 0.5)';
                 }
+                ctx.fill();
+                ctx.strokeStyle = 'black';
+                ctx.stroke();
+                ctx.fillStyle = 'black';
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(circle.id, circle.x, circle.y + 5);
             });
         }
 
         // Мигание круга
-        document.getElementById('findPlantBtn').addEventListener('click', function() {
-            const selectedSubgroup = selectedFilters.subgroup;
-            if (!selectedSubgroup) {
-                document.getElementById('status').textContent = 'Выберите круг в фильтре "Круг".';
-                return;
-            }
-            blinkingCircleId = selectedSubgroup;
-            isBlinking = true;
-            if (blinkInterval) clearInterval(blinkInterval);
-            blinkInterval = setInterval(() => {
-                isBlinking = !isBlinking;
-                drawCircles();
-            }, 500);
-            setTimeout(() => {
+        function blinkCircle(id) {
+            if (isBlinking) {
                 clearInterval(blinkInterval);
                 isBlinking = false;
-                blinkingCircleId = null;
+            }
+            const circle = circles.find(c => c.id === id);
+            if (!circle) {
+                document.getElementById('status').textContent = 'Круг с таким ID не найден.';
+                return;
+            }
+            blinkingCircleId = id;
+            isBlinking = true;
+            let blinkCount = 0;
+            blinkInterval = setInterval(() => {
                 drawCircles();
-            }, 3000);
-            document.getElementById('status').textContent = `Круг "${selectedSubgroup}" мигает 3 секунды.`;
-        });
-
-        // Переход в режим разработчика
-        document.getElementById('switchToDeveloperBtn').addEventListener('click', function() {
-            window.location.href = 'developer.html';  // Замените на реальную ссылку
-        });
+                blinkCount++;
+                if (blinkCount >= 6) {  // 3 секунды (6 раз по 500мс)
+                    clearInterval(blinkInterval);
+                    isBlinking = false;
+                    blinkingCircleId = null;
+                    drawCircles();
+                }
+            }, 500);
+        }
 
         // Инициализация
-        background.onload = drawCircles;
-        loadCircles().then(() => loadCSV()).then(() => drawCircles());
+        async function init() {
+            await Promise.all([loadCircles(), loadCSV()]);
+            populateFilters();
+            drawCircles();
+            background.onload = drawCircles;
+        }
+
+        init();
+
+        // Кнопка "Найти растение"
+        document.getElementById('findPlantBtn').addEventListener('click', () => {
+            if (!selectedFilters.subgroup) {
+                document.getElementById('status').textContent = 'Сначала выберите круг в фильтре.';
+                return;
+            }
+            blinkCircle(selectedFilters.subgroup);
+        });
+
+        // Кнопка перехода в режим разработчика (заглушка)
+        document.getElementById('switchToDeveloperBtn').addEventListener('click', () => {
+            alert('Переход в режим разработчика (не реализовано)');
+        });
     </script>
 </body>
 </html>

@@ -19,10 +19,10 @@
         <h1>Пользовательский режим</h1>
         <div id="filters">
             <select id="classSelect"><option>Выберите Класс</option></select>
-            <select id="subclassSelect"><option>Выберите Подкласс</option></select>
-            <select id="typeSelect"><option>Выберите Тип</option></select>
-            <select id="subtypeSelect"><option>Выберите Подтип</option></select>
-            <select id="groupSelect"><option>Выберите Группу</option></select>
+            <select id="subclassSelect"><option>Выберите Семейство</option></select>
+            <select id="typeSelect"><option>Выберите Род</option></select>
+            <select id="subtypeSelect"><option>Выберите Вид</option></select>
+            <select id="groupSelect"><option>Выберите Сорт</option></select>
             <select id="subgroupSelect"><option>Выберите Круг</option></select>
         </div>
         <div id="controls">
@@ -61,9 +61,9 @@
             } catch (e) {
                 console.warn('Не удалось загрузить circles_export.json, используем дефолтные круги:', e.message);
                 circles = [
-                    { id: 'Подгруппа1', x: 100, y: 100 },
-                    { id: 'Подгруппа2', x: 200, y: 200 },
-                    { id: 'Подгруппа3', x: 300, y: 300 }
+                    { id: 'Круг1', x: 100, y: 100 },
+                    { id: 'Круг2', x: 200, y: 200 },
+                    { id: 'Круг3', x: 300, y: 300 }
                 ];
                 document.getElementById('status').textContent = 'Используются демо-круги.';
             }
@@ -85,20 +85,20 @@
                 if (rows.length < 2) throw new Error('CSV содержит менее 2 строк (заголовки + данные)');
                 const headers = rows[0].split(';').map(h => h.replace(/^"|"$/g, '').trim());
                 console.log('Заголовки:', headers);
-                if (headers.length !== 6 || !headers.includes('Класс') || !headers.includes('Подгруппа')) {
-                    throw new Error('Заголовки CSV не соответствуют ожидаемым: ["Класс", "Подкласс", "Тип", "Подтип", "Группа", "Подгруппа"]');
+                if (headers.length !== 6 || !headers.includes('Класс') || !headers.includes('Круг')) {
+                    throw new Error('Заголовки CSV не соответствуют ожидаемым: ["Класс", "Семейство", "Род", "Вид", "Сорт", "Круг"]');
                 }
 
                 data = rows.slice(1).map(row => {
                     const cells = row.split(';').map(cell => cell.replace(/^"|"$/g, '').trim());
                     if (cells.length !== 6) return null;
                     return {
-                        class: cells[0],
-                        subclass: cells[1],
-                        type: cells[2],
-                        subtype: cells[3],
-                        group: cells[4],
-                        subgroup: cells[5]
+                        class: cells[0],     // Класс
+                        subclass: cells[1],  // Семейство
+                        type: cells[2],      // Род
+                        subtype: cells[3],   // Вид
+                        group: cells[4],     // Сорт
+                        subgroup: cells[5]  // Круг
                     };
                 }).filter(item => item && item.class && item.subgroup);
                 console.log('Данные загружены из CSV:', data.length, 'записей');
@@ -107,9 +107,9 @@
             } catch (e) {
                 console.warn('Ошибка загрузки/парсинга CSV, используем демо-данные для фильтров:', e.message);
                 data = [
-                    { class: 'Класс1', subclass: 'Подкласс1', type: 'Тип1', subtype: 'Подтип1', group: 'Группа1', subgroup: 'Подгруппа1' },
-                    { class: 'Класс1', subclass: 'Подкласс1', type: 'Тип1', subtype: 'Подтип1', group: 'Группа1', subgroup: 'Подгруппа2' },
-                    { class: 'Класс2', subclass: 'Подкласс2', type: 'Тип2', subtype: 'Подтип2', group: 'Группа2', subgroup: 'Подгруппа3' }
+                    { class: 'Класс1', subclass: 'Семейство1', type: 'Род1', subtype: 'Вид1', group: 'Сорт1', subgroup: 'Круг1' },
+                    { class: 'Класс1', subclass: 'Семейство1', type: 'Род1', subtype: 'Вид1', group: 'Сорт1', subgroup: 'Круг2' },
+                    { class: 'Класс2', subclass: 'Семейство2', type: 'Род2', subtype: 'Вид2', group: 'Сорт2', subgroup: 'Круг3' }
                 ];
                 document.getElementById('status').textContent += ' Используются демо-данные для фильтров.';
             }
@@ -140,7 +140,7 @@
 
             function updateSubclass() {
                 const subclasses = [...new Set(data.filter(d => !selectedFilters.class || d.class === selectedFilters.class).map(d => d.subclass))].sort();
-                subclassSelect.innerHTML = '<option>Выберите Подкласс</option>' + subclasses.map(c => `<option value="${c}">${c}</option>`).join('');
+                subclassSelect.innerHTML = '<option>Выберите Семейство</option>' + subclasses.map(c => `<option value="${c}">${c}</option>`).join('');
                 subclassSelect.disabled = subclasses.length === 0;
                 updateType();
             }
@@ -156,7 +156,7 @@
 
             function updateType() {
                 const types = [...new Set(data.filter(d => (!selectedFilters.class || d.class === selectedFilters.class) && (!selectedFilters.subclass || d.subclass === selectedFilters.subclass)).map(d => d.type))].sort();
-                typeSelect.innerHTML = '<option>Выберите Тип</option>' + types.map(c => `<option value="${c}">${c}</option>`).join('');
+                typeSelect.innerHTML = '<option>Выберите Род</option>' + types.map(c => `<option value="${c}">${c}</option>`).join('');
                 typeSelect.disabled = types.length === 0;
                 updateSubtype();
             }
@@ -171,7 +171,7 @@
 
             function updateSubtype() {
                 const subtypes = [...new Set(data.filter(d => (!selectedFilters.class || d.class === selectedFilters.class) && (!selectedFilters.subclass || d.subclass === selectedFilters.subclass) && (!selectedFilters.type || d.type === selectedFilters.type)).map(d => d.subtype))].sort();
-                subtypeSelect.innerHTML = '<option>Выберите Подтип</option>' + subtypes.map(c => `<option value="${c}">${c}</option>`).join('');
+                subtypeSelect.innerHTML = '<option>Выберите Вид</option>' + subtypes.map(c => `<option value="${c}">${c}</option>`).join('');
                 subtypeSelect.disabled = subtypes.length === 0;
                 updateGroup();
             }
@@ -185,7 +185,7 @@
 
             function updateGroup() {
                 const groups = [...new Set(data.filter(d => (!selectedFilters.class || d.class === selectedFilters.class) && (!selectedFilters.subclass || d.subclass === selectedFilters.subclass) && (!selectedFilters.type || d.type === selectedFilters.type) && (!selectedFilters.subtype || d.subtype === selectedFilters.subtype)).map(d => d.group))].sort();
-                groupSelect.innerHTML = '<option>Выберите Группу</option>' + groups.map(c => `<option value="${c}">${c}</option>`).join('');
+                groupSelect.innerHTML = '<option>Выберите Сорт</option>' + groups.map(c => `<option value="${c}">${c}</option>`).join('');
                 groupSelect.disabled = groups.length === 0;
                 updateSubgroup();
             }

@@ -8,6 +8,7 @@
         #container { display: flex; flex-direction: column; align-items: center; }
         #filters { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
         select { padding: 5px; }
+        #subgroupSelect { display: none; } /* Скрываем селектор Круга */
         #controls { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
         button { padding: 10px; }
         #canvas { border: 1px solid #000; }
@@ -23,7 +24,7 @@
             <select id="typeSelect"><option>Выберите Род</option></select>
             <select id="subtypeSelect"><option>Выберите Вид</option></select>
             <select id="groupSelect"><option>Выберите Сорт</option></select>
-            <select id="subgroupSelect"><option>Выберите Круг</option></select>
+            <select id="subgroupSelect"><option>Выберите Круг</option></select> <!-- Скрыт -->
         </div>
         <div id="controls">
             <button id="findPlantBtn">Найти растение</button>
@@ -108,7 +109,7 @@
                 console.warn('Ошибка загрузки/парсинга CSV, используем демо-данные для фильтров:', e.message);
                 data = [
                     { class: 'Класс1', subclass: 'Семейство1', type: 'Род1', subtype: 'Вид1', group: 'Сорт1', subgroup: 'Круг1' },
-                    { class: 'Класс1', subclass: 'Семейство1', type: 'Род1', subtype: 'Вид1', group: 'Сорт1', subgroup: 'Круг2' },
+                    { class: 'Класс1', subclass: 'Семейство1', type: 'Род1', subtype: 'Вид1', group: 'Сорт1', subgroup: 'Круг2' },  // Для теста, но в реальности однозначно
                     { class: 'Класс2', subclass: 'Семейство2', type: 'Род2', subtype: 'Вид2', group: 'Сорт2', subgroup: 'Круг3' }
                 ];
                 document.getElementById('status').textContent += ' Используются демо-данные для фильтров.';
@@ -122,7 +123,7 @@
             const typeSelect = document.getElementById('typeSelect');
             const subtypeSelect = document.getElementById('subtypeSelect');
             const groupSelect = document.getElementById('groupSelect');
-            const subgroupSelect = document.getElementById('subgroupSelect');
+            // subgroupSelect скрыт и не используется
 
             // Класс
             const classes = [...new Set(data.map(d => d.class))].sort();
@@ -187,23 +188,20 @@
                 const groups = [...new Set(data.filter(d => (!selectedFilters.class || d.class === selectedFilters.class) && (!selectedFilters.subclass || d.subclass === selectedFilters.subclass) && (!selectedFilters.type || d.type === selectedFilters.type) && (!selectedFilters.subtype || d.subtype === selectedFilters.subtype)).map(d => d.group))].sort();
                 groupSelect.innerHTML = '<option>Выберите Сорт</option>' + groups.map(c => `<option value="${c}">${c}</option>`).join('');
                 groupSelect.disabled = groups.length === 0;
-                updateSubgroup();
             }
 
             groupSelect.addEventListener('change', () => {
                 selectedFilters.group = groupSelect.value;
                 selectedFilters.subgroup = '';
-                updateSubgroup();
-            });
-
-            function updateSubgroup() {
-                const subgroups = [...new Set(data.filter(d => (!selectedFilters.class || d.class === selectedFilters.class) && (!selectedFilters.subclass || d.subclass === selectedFilters.subclass) && (!selectedFilters.type || d.type === selectedFilters.type) && (!selectedFilters.subtype || d.subtype === selectedFilters.subtype) && (!selectedFilters.group || d.group === selectedFilters.group)).map(d => d.subgroup))].sort();
-                subgroupSelect.innerHTML = '<option>Выберите Круг</option>' + subgroups.map(c => `<option value="${c}">${c}</option>`).join('');
-                subgroupSelect.disabled = subgroups.length === 0;
-            }
-
-            subgroupSelect.addEventListener('change', () => {
-                selectedFilters.subgroup = subgroupSelect.value;
+                // Автоматически определить subgroup (Круг) по выбранному Сорту
+                const matching = data.filter(d => d.class === selectedFilters.class && d.subclass === selectedFilters.subclass && d.type === selectedFilters.type && d.subtype === selectedFilters.subtype && d.group === selectedFilters.group);
+                if (matching.length > 0) {
+                    // Предполагаем однозначное соответствие, берем первый (или единственный)
+                    selectedFilters.subgroup = matching[0].subgroup;
+                    console.log('Определен Круг:', selectedFilters.subgroup);
+                } else {
+                    console.warn('Не найден соответствующий Круг для выбранного Сорта');
+                }
             });
         }
 
@@ -215,7 +213,7 @@
             }
             circles.forEach(circle => {
                 ctx.beginPath();
-                ctx.arc(circle.x, circle.y, 20, 0, 2 * Math.PI);
+                ctx.arc(circle.x, circle.y, 7, 0, 2 * Math.PI);  // Радиус уменьшен в ~3 раза (20 / 3 ≈ 6.67, округлено до 7)
                 if (isBlinking && blinkingCircleId === circle.id) {
                     ctx.fillStyle = 'red';
                 } else {
@@ -224,10 +222,7 @@
                 ctx.fill();
                 ctx.strokeStyle = 'black';
                 ctx.stroke();
-                ctx.fillStyle = 'black';
-                ctx.font = '12px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText(circle.id, circle.x, circle.y + 5);
+                // Названия кругов убраны
             });
         }
 
@@ -269,8 +264,12 @@
 
         // Кнопка "Найти растение"
         document.getElementById('findPlantBtn').addEventListener('click', () => {
+            if (!selectedFilters.group) {
+                document.getElementById('status').textContent = 'Сначала выберите Сорт в фильтре.';
+                return;
+            }
             if (!selectedFilters.subgroup) {
-                document.getElementById('status').textContent = 'Сначала выберите круг в фильтре.';
+                document.getElementById('status').textContent = 'Круг не определен для выбранного Сорта.';
                 return;
             }
             blinkCircle(selectedFilters.subgroup);

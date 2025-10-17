@@ -2,14 +2,14 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Просмотр кругов</title>
+    <title>Пользовательский режим - Просмотр кругов</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f0f0f0; }
         #container { display: flex; flex-direction: column; align-items: center; }
-        #topControls { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-        .filter-group { display: flex; flex-direction: column; align-items: flex-start; }
-        label { font-weight: bold; margin-bottom: 2px; font-size: 12px; }
-        select { padding: 5px; min-width: 120px; }
+        #filters { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+        select { padding: 5px; }
+        #subgroupSelect { display: none; } /* Скрываем селектор Круга */
+        #controls { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
         button { padding: 10px; }
         #canvas { border: 1px solid #000; }
         #status { margin-top: 10px; font-size: 14px; color: #555; }
@@ -17,34 +17,18 @@
 </head>
 <body>
     <div id="container">
-        <h1 id="modeTitle">Режим разработчика</h1>
-        <div id="topControls">
-            <div class="filter-group">
-                <label for="classSelect">Класс:</label>
-                <select id="classSelect"><option>Не выбрано</option></select>
-            </div>
-            <div class="filter-group">
-                <label for="subclassSelect">Семейство:</label>
-                <select id="subclassSelect"><option>Не выбрано</option></select>
-            </div>
-            <div class="filter-group">
-                <label for="typeSelect">Род:</label>
-                <select id="typeSelect"><option>Не выбрано</option></select>
-            </div>
-            <div class="filter-group">
-                <label for="subtypeSelect">Вид:</label>
-                <select id="subtypeSelect"><option>Не выбрано</option></select>
-            </div>
-            <div class="filter-group">
-                <label for="groupSelect">Сорт:</label>
-                <select id="groupSelect"><option>Не выбрано</option></select>
-            </div>
-            <div class="filter-group">
-                <label for="subgroupSelect">Круг:</label>
-                <select id="subgroupSelect"><option>Не выбрано</option></select>
-            </div>
+        <h1 id="modeTitle">Пользовательский режим</h1>
+        <div id="filters">
+            <select id="classSelect"><option>Не выбрано</option></select>
+            <select id="subclassSelect"><option>Не выбрано</option></select>
+            <select id="typeSelect"><option>Не выбрано</option></select>
+            <select id="subtypeSelect"><option>Не выбрано</option></select>
+            <select id="groupSelect"><option>Не выбрано</option></select>
+            <select id="subgroupSelect"><option>Не выбрано</option></select> <!-- Скрыт -->
+        </div>
+        <div id="controls">
             <button id="findPlantBtn">Найти растение</button>
-            <button id="switchToUserBtn">Перейти в пользовательский режим</button>
+            <button id="switchToDeveloperBtn">Перейти в режим разработчика</button>
         </div>
         <canvas id="canvas" width="800" height="600"></canvas>
         <div id="status">Загрузка данных...</div>
@@ -58,7 +42,7 @@
 
         let circles = [];
         let data = [];
-        let selectedFilters = { class: '', subclass: '', type: '', subtype: '', group: '', subgroup: '' }; // subgroup включен
+        let selectedFilters = { class: '', subclass: '', type: '', subtype: '', group: '' }; // Убрали subgroup из selectedFilters, так как он скрыт
         let blinkingCircleIds = [];
         let blinkInterval = null;
         let isBlinking = false;
@@ -139,7 +123,6 @@
             const typeSelect = document.getElementById('typeSelect');
             const subtypeSelect = document.getElementById('subtypeSelect');
             const groupSelect = document.getElementById('groupSelect');
-            const subgroupSelect = document.getElementById('subgroupSelect');
 
             // Функция для обновления всех фильтров на основе текущих selectedFilters
             function updateAllFilters() {
@@ -149,8 +132,7 @@
                            (!selectedFilters.subclass || d.subclass === selectedFilters.subclass) &&
                            (!selectedFilters.type || d.type === selectedFilters.type) &&
                            (!selectedFilters.subtype || d.subtype === selectedFilters.subtype) &&
-                           (!selectedFilters.group || d.group === selectedFilters.group) &&
-                           (!selectedFilters.subgroup || d.subgroup === selectedFilters.subgroup);
+                           (!selectedFilters.group || d.group === selectedFilters.group);
                 });
 
                 // Обновляем каждый селект
@@ -173,10 +155,6 @@
                 const groups = [...new Set(filteredData.map(d => d.group))].sort();
                 groupSelect.innerHTML = '<option value="">Не выбрано</option>' + groups.map(c => `<option value="${c}">${c}</option>`).join('');
                 groupSelect.value = selectedFilters.group;
-
-                const subgroups = [...new Set(filteredData.map(d => d.subgroup))].sort();
-                subgroupSelect.innerHTML = '<option value="">Не выбрано</option>' + subgroups.map(c => `<option value="${c}">${c}</option>`).join('');
-                subgroupSelect.value = selectedFilters.subgroup;
             }
 
             // Изначально все фильтры на "Не выбрано", показываем все
@@ -205,11 +183,6 @@
 
             groupSelect.addEventListener('change', () => {
                 selectedFilters.group = groupSelect.value;
-                updateAllFilters();
-            });
-
-            subgroupSelect.addEventListener('change', () => {
-                selectedFilters.subgroup = subgroupSelect.value;
                 updateAllFilters();
             });
         }
@@ -272,29 +245,23 @@
 
         // Кнопка "Найти растение"
         document.getElementById('findPlantBtn').addEventListener('click', () => {
-            // В режиме разработчика требует выбора subgroup
-            if (!selectedFilters.subgroup) {
-                alert('В режиме разработчика необходимо выбрать Круг.');
-                return;
-            }
             // Фильтруем данные по выбранным фильтрам
             const filteredData = data.filter(d => {
                 return (!selectedFilters.class || d.class === selectedFilters.class) &&
                        (!selectedFilters.subclass || d.subclass === selectedFilters.subclass) &&
                        (!selectedFilters.type || d.type === selectedFilters.type) &&
                        (!selectedFilters.subtype || d.subtype === selectedFilters.subtype) &&
-                       (!selectedFilters.group || d.group === selectedFilters.group) &&
-                       (!selectedFilters.subgroup || d.subgroup === selectedFilters.subgroup);
+                       (!selectedFilters.group || d.group === selectedFilters.group);
             });
             // Собираем уникальные subgroup (Круги) из отфильтрованных данных
             const uniqueSubgroups = [...new Set(filteredData.map(d => d.subgroup))];
             blinkCircles(uniqueSubgroups);
         });
 
-        // Кнопка перехода в пользовательский режим - перенаправление на index.html или user.html из репозитария
-        document.getElementById('switchToUserBtn').addEventListener('click', () => {
-            // Предполагаем, что пользовательский режим на index.html или user.html
-            window.location.href = 'https://oluneva.github.io/my_site/index.html'; // Или user.html, если файл называется иначе
+        // Кнопка перехода в режим разработчика - перенаправление на developer.html из репозитария
+        document.getElementById('switchToDeveloperBtn').addEventListener('click', () => {
+            // Предполагаем, что репозитарий опубликован как GitHub Pages по адресу https://oluneva.github.io/my_site/
+            window.location.href = 'https://oluneva.github.io/my_site/developer.html';
         });
     </script>
 </body>

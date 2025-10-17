@@ -7,12 +7,12 @@
         body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f0f0f0; }
         #container { display: flex; flex-direction: column; align-items: center; }
         #filtersAndControls { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 20px; }
-        .filter-group { display: flex; flex-direction: column; align-items: center; gap: 5px; }
-        label { font-weight: bold; }
-        select { padding: 5px; }
+        .labels-row { display: flex; gap: 10px; justify-content: center; }
+        .labels-row label { font-weight: bold; flex: 1; text-align: center; }
+        .filters-row { display: flex; gap: 10px; justify-content: center; align-items: center; }
+        .filters-row select { padding: 5px; flex: 1; }
+        .filters-row button { padding: 10px; }
         #subgroupGroup { display: none; }
-        #controls { display: flex; gap: 10px; }
-        button { padding: 10px; }
         #canvas { border: 1px solid #000; }
         #status { margin-top: 10px; font-size: 14px; color: #555; }
     </style>
@@ -21,31 +21,19 @@
     <div id="container">
         <h1 id="modeTitle">Пользовательский режим</h1>
         <div id="filtersAndControls">
-            <div class="filter-group">
-                <label for="classSelect">Класс:</label>
+            <div class="labels-row">
+                <label for="classSelect">Класс</label>
+                <label for="subclassSelect">Семейство</label>
+                <label for="typeSelect">Род</label>
+                <label for="subtypeSelect">Вид</label>
+                <label for="groupSelect">Сорт</label>
+            </div>
+            <div class="filters-row">
                 <select id="classSelect"><option>Не выбрано</option></select>
-            </div>
-            <div class="filter-group">
-                <label for="subclassSelect">Семейство:</label>
                 <select id="subclassSelect"><option>Не выбрано</option></select>
-            </div>
-            <div class="filter-group">
-                <label for="typeSelect">Род:</label>
                 <select id="typeSelect"><option>Не выбрано</option></select>
-            </div>
-            <div class="filter-group">
-                <label for="subtypeSelect">Вид:</label>
                 <select id="subtypeSelect"><option>Не выбрано</option></select>
-            </div>
-            <div class="filter-group">
-                <label for="groupSelect">Сорт:</label>
                 <select id="groupSelect"><option>Не выбрано</option></select>
-            </div>
-            <div class="filter-group" id="subgroupGroup">
-                <label for="subgroupSelect">Круг:</label>
-                <select id="subgroupSelect"><option>Не выбрано</option></select>
-            </div>
-            <div id="controls">
                 <button id="findPlantBtn">Найти растение</button>
                 <button id="switchToDeveloperBtn">Перейти в режим разработчика</button>
             </div>

@@ -25,7 +25,8 @@
             padding: 20px;
         }
         #canvas {
-            /* Убрал max-width и max-height для фиксированного размера по изображению; если нужно responsive, верните и адаптируйте код */
+            max-width: 100%;
+            height: auto;
             display: block;
         }
         #rightPanel {
@@ -173,6 +174,9 @@
                 console.log('Изображение загружено, рисую...');
                 canvas.width = img.width;
                 canvas.height = img.height;
+                canvas.style.width = '100%';  // Масштабируем канвас под контейнер
+                canvas.style.height = 'auto';  // Сохраняем пропорции
+                
                 ctx.drawImage(img, 0, 0);
                 
                 // Рисуем круги

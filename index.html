@@ -6,10 +6,13 @@
     <style>
         body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f0f0f0; }
         #container { display: flex; flex-direction: column; align-items: center; }
-        #filtersAndControls { margin-bottom: 20px; display: flex; flex-direction: row; gap: 10px; align-items: center; }
-        label { font-weight: bold; margin-right: 5px; }
+        #filtersAndControls { margin-bottom: 20px; }
+        #filterLabels { display: flex; gap: 10px; justify-content: center; }
+        #filterSelects { display: flex; gap: 10px; justify-content: center; margin-bottom: 10px; }
+        #controls { display: flex; gap: 10px; justify-content: center; }
+        label { font-weight: bold; }
         select { padding: 5px; }
-        #subgroupSelect { display: none; } /* Скрываем селектор Круга */
+        #subgroupSelect { display: none; }
         button { padding: 10px; }
         #canvas { border: 1px solid #000; }
         #status { margin-top: 10px; font-size: 14px; color: #555; }
@@ -19,18 +22,20 @@
     <div id="container">
         <h1 id="modeTitle">Пользовательский режим</h1>
         <div id="filtersAndControls">
-            <div id="filters">
+            <div id="filterLabels">
                 <label for="classSelect">Класс:</label>
-                <select id="classSelect"><option>Не выбрано</option></select>
                 <label for="subclassSelect">Семейство:</label>
-                <select id="subclassSelect"><option>Не выбрано</option></select>
                 <label for="typeSelect">Род:</label>
-                <select id="typeSelect"><option>Не выбрано</option></select>
                 <label for="subtypeSelect">Вид:</label>
-                <select id="subtypeSelect"><option>Не выбрано</option></select>
                 <label for="groupSelect">Сорт:</label>
+                <label for="subgroupSelect" style="display: none;">Круг:</label>
+            </div>
+            <div id="filterSelects">
+                <select id="classSelect"><option>Не выбрано</option></select>
+                <select id="subclassSelect"><option>Не выбрано</option></select>
+                <select id="typeSelect"><option>Не выбрано</option></select>
+                <select id="subtypeSelect"><option>Не выбрано</option></select>
                 <select id="groupSelect"><option>Не выбрано</option></select>
-                <label for="subgroupSelect" style="display: none;">Круг:</label> <!-- Скрыт вместе с селектором -->
                 <select id="subgroupSelect"><option>Не выбрано</option></select>
             </div>
             <div id="controls">

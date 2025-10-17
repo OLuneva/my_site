@@ -58,6 +58,22 @@
     </div>
 
     <script>
+        // Простая проверка пароля при загрузке страницы
+        const PASSWORD = 'demo123';  // Замените на свой пароль
+
+        window.onload = function() {
+            const enteredPassword = prompt('Введите пароль для доступа к пользовательскому режиму:');
+            if (enteredPassword !== PASSWORD) {
+                alert('Неверный пароль. Доступ запрещён.');
+                // Можно добавить перенаправление: window.location.href = 'https://example.com'; 
+                // Или скрыть контент: document.body.innerHTML = '<h1>Доступ запрещён</h1>';
+                document.body.innerHTML = '<h1>Доступ запрещён</h1>';  // Заменяет всю страницу на сообщение
+                return;
+            }
+            // Если пароль верный, инициализируем сайт
+            init();
+        };
+
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         const background = new Image();
@@ -256,15 +272,13 @@
             }, 500);
         }
 
-        // Инициализация
+        // Инициализация (вызывается только после успешной проверки пароля)
         async function init() {
             await Promise.all([loadCircles(), loadCSV()]);
             populateFilters();
             drawCircles();
             background.onload = drawCircles;
         }
-
-        init();
 
         // Кнопка "Найти растение"
         document.getElementById('findPlantBtn').addEventListener('click', () => {

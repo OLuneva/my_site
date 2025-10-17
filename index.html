@@ -8,7 +8,7 @@
         #container { display: flex; flex-direction: column; align-items: center; }
         #filters { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
         select { padding: 5px; }
-        #subgroupSelect { display: none; } /* Скрываем селектор Круга по умолчанию */
+        #subgroupSelect { display: none; } /* Скрываем селектор Круга */
         #controls { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
         button { padding: 10px; }
         #canvas { border: 1px solid #000; }
@@ -24,7 +24,7 @@
             <select id="typeSelect"><option>Не выбрано</option></select>
             <select id="subtypeSelect"><option>Не выбрано</option></select>
             <select id="groupSelect"><option>Не выбрано</option></select>
-            <select id="subgroupSelect"><option>Не выбрано</option></select> <!-- Скрыт в пользовательском режиме -->
+            <select id="subgroupSelect"><option>Не выбрано</option></select> <!-- Скрыт -->
         </div>
         <div id="controls">
             <button id="findPlantBtn">Найти растение</button>
@@ -42,8 +42,8 @@
 
         let circles = [];
         let data = [];
-        let selectedFilters = { class: '', subclass: '', type: '', subtype: '', group: '', subgroup: '' };
-        let blinkingCircleId = null;
+        let selectedFilters = { class: '', subclass: '', type: '', subtype: '', group: '' }; // Убрали subgroup из selectedFilters, так как он скрыт
+        let blinkingCircleIds = [];
         let blinkInterval = null;
         let isBlinking = false;
         let csvLoaded = false;
@@ -86,32 +86,31 @@
                 if (rows.length < 2) throw new Error('CSV содержит менее 2 строк (заголовки + данные)');
                 const headers = rows[0].split(';').map(h => h.replace(/^"|"$/g, '').trim());
                 console.log('Заголовки:', headers);
-                if (headers.length !== 7 || !headers.includes('Класс') || !headers.includes('Круг') || !headers.includes('Однозначно')) {
-                    throw new Error('Заголовки CSV не соответствуют ожидаемым: ["Класс", "Семейство", "Род", "Вид", "Сорт", "Круг", "Однозначно"]');
+                if (headers.length !== 6 || !headers.includes('Класс') || !headers.includes('Круг')) {
+                    throw new Error('Заголовки CSV не соответствуют ожидаемым: ["Класс", "Семейство", "Род", "Вид", "Сорт", "Круг"]');
                 }
 
                 data = rows.slice(1).map(row => {
                     const cells = row.split(';').map(cell => cell.replace(/^"|"$/g, '').trim());
-                    if (cells.length !== 7) return null;
+                    if (cells.length !== 6) return null;
                     return {
                         class: cells[0],     // Класс
                         subclass: cells[1],  // Семейство
                         type: cells[2],      // Род
                         subtype: cells[3],   // Вид
                         group: cells[4],     // Сорт
-                        subgroup: cells[5],  // Круг
-                        unique: cells[6]     // Однозначно (скрытое поле)
+                        subgroup: cells[5]   // Круг
                     };
-                }).filter(item => item && item.class && item.subgroup && item.unique);
+                }).filter(item => item && item.class && item.subgroup);
                 console.log('Данные загружены из CSV:', data.length, 'записей');
                 csvLoaded = true;
                 document.getElementById('status').textContent += ' Данные фильтров загружены.';
             } catch (e) {
                 console.warn('Ошибка загрузки/парсинга CSV, используем демо-данные для фильтров:', e.message);
                 data = [
-                    { class: 'Класс1', subclass: 'Семейство1', type: 'Род1', subtype: 'Вид1', group: 'Сорт1', subgroup: 'Круг1', unique: 'Уник1' },
-                    { class: 'Класс1', subclass: 'Семейство1', type: 'Род1', subtype: 'Вид1', group: 'Сорт1', subgroup: 'Круг2', unique: 'Уник2' },  // Для теста
-                    { class: 'Класс2', subclass: 'Семейство2', type: 'Род2', subtype: 'Вид2', group: 'Сорт2', subgroup: 'Круг3', unique: 'Уник3' }
+                    { class: 'Класс1', subclass: 'Семейство1', type: 'Род1', subtype: 'Вид1', group: 'Сорт1', subgroup: 'Круг1' },
+                    { class: 'Класс1', subclass: 'Семейство1', type: 'Род1', subtype: 'Вид1', group: 'Сорт1', subgroup: 'Круг2' },  // Для теста нескольких кругов
+                    { class: 'Класс2', subclass: 'Семейство2', type: 'Род2', subtype: 'Вид2', group: 'Сорт2', subgroup: 'Круг3' }
                 ];
                 document.getElementById('status').textContent += ' Используются демо-данные для фильтров.';
             }
@@ -124,7 +123,6 @@
             const typeSelect = document.getElementById('typeSelect');
             const subtypeSelect = document.getElementById('subtypeSelect');
             const groupSelect = document.getElementById('groupSelect');
-            const subgroupSelect = document.getElementById('subgroupSelect');
 
             // Функция для обновления всех фильтров на основе текущих selectedFilters
             function updateAllFilters() {
@@ -134,8 +132,7 @@
                            (!selectedFilters.subclass || d.subclass === selectedFilters.subclass) &&
                            (!selectedFilters.type || d.type === selectedFilters.type) &&
                            (!selectedFilters.subtype || d.subtype === selectedFilters.subtype) &&
-                           (!selectedFilters.group || d.group === selectedFilters.group) &&
-                           (!selectedFilters.subgroup || d.subgroup === selectedFilters.subgroup);
+                           (!selectedFilters.group || d.group === selectedFilters.group);
                 });
 
                 // Обновляем каждый селект
@@ -158,10 +155,6 @@
                 const groups = [...new Set(filteredData.map(d => d.group))].sort();
                 groupSelect.innerHTML = '<option value="">Не выбрано</option>' + groups.map(c => `<option value="${c}">${c}</option>`).join('');
                 groupSelect.value = selectedFilters.group;
-
-                const subgroups = [...new Set(filteredData.map(d => d.subgroup))].sort();
-                subgroupSelect.innerHTML = '<option value="">Не выбрано</option>' + subgroups.map(c => `<option value="${c}">${c}</option>`).join('');
-                subgroupSelect.value = selectedFilters.subgroup;
             }
 
             // Изначально все фильтры на "Не выбрано", показываем все
@@ -192,11 +185,6 @@
                 selectedFilters.group = groupSelect.value;
                 updateAllFilters();
             });
-
-            subgroupSelect.addEventListener('change', () => {
-                selectedFilters.subgroup = subgroupSelect.value;
-                updateAllFilters();
-            });
         }
 
         // Рендеринг кругов (всегда отображаются)
@@ -208,7 +196,7 @@
             circles.forEach(circle => {
                 ctx.beginPath();
                 ctx.arc(circle.x, circle.y, 7, 0, 2 * Math.PI);  // Радиус уменьшен в ~3 раза (20 / 3 ≈ 6.67, округлено до 7)
-                if (isBlinking && blinkingCircleId === circle.id) {
+                if (isBlinking && blinkingCircleIds.includes(circle.id)) {
                     ctx.fillStyle = 'red';
                 } else {
                     ctx.fillStyle = 'rgba(0, 128, 0, 0.5)';
@@ -220,18 +208,17 @@
             });
         }
 
-        // Мигание круга
-        function blinkCircle(id) {
+        // Мигание кругов
+        function blinkCircles(ids) {
             if (isBlinking) {
                 clearInterval(blinkInterval);
                 isBlinking = false;
             }
-            const circle = circles.find(c => c.id === id);
-            if (!circle) {
-                document.getElementById('status').textContent = 'Круг с таким ID не найден.';
+            blinkingCircleIds = ids;
+            if (blinkingCircleIds.length === 0) {
+                document.getElementById('status').textContent = 'Не найдено кругов для выбранных фильтров.';
                 return;
             }
-            blinkingCircleId = id;
             isBlinking = true;
             let blinkCount = 0;
             blinkInterval = setInterval(() => {
@@ -240,7 +227,7 @@
                 if (blinkCount >= 6) {  // 3 секунды (6 раз по 500мс)
                     clearInterval(blinkInterval);
                     isBlinking = false;
-                    blinkingCircleId = null;
+                    blinkingCircleIds = [];
                     drawCircles();
                 }
             }, 500);
@@ -258,17 +245,17 @@
 
         // Кнопка "Найти растение"
         document.getElementById('findPlantBtn').addEventListener('click', () => {
-            if (!selectedFilters.group) {
-                document.getElementById('status').textContent = 'Сначала выберите Сорт в фильтре.';
-                return;
-            }
-            // Найти значение в поле "Однозначно" по выбранному group
-            const matchingData = data.find(d => d.group === selectedFilters.group);
-            if (!matchingData || !matchingData.unique) {
-                document.getElementById('status').textContent = 'Не найдено соответствующее значение для поиска.';
-                return;
-            }
-            blinkCircle(matchingData.unique);
+            // Фильтруем данные по выбранным фильтрам
+            const filteredData = data.filter(d => {
+                return (!selectedFilters.class || d.class === selectedFilters.class) &&
+                       (!selectedFilters.subclass || d.subclass === selectedFilters.subclass) &&
+                       (!selectedFilters.type || d.type === selectedFilters.type) &&
+                       (!selectedFilters.subtype || d.subtype === selectedFilters.subtype) &&
+                       (!selectedFilters.group || d.group === selectedFilters.group);
+            });
+            // Собираем уникальные subgroup (Круги) из отфильтрованных данных
+            const uniqueSubgroups = [...new Set(filteredData.map(d => d.subgroup))];
+            blinkCircles(uniqueSubgroups);
         });
 
         // Кнопка перехода в режим разработчика - перенаправление на developer.html из репозитария

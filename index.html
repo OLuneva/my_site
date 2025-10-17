@@ -163,31 +163,58 @@
         window.addEventListener('resize', resizeCanvas);
 
         // Функция загрузки кругов из circles_export.json
-        async function loadCircles() {
-            try {
-                console.log('Пытаюсь загрузить circles_export.json...');
-                const response = await fetch('https://raw.githubusercontent.com/oluneva/my_site/main/circles_export.json');
-                if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                circles = await response.json();
-                circles = circles.filter(circle => circle && typeof circle.id === 'string' && circle.id.trim() !== '' && typeof circle.x === 'number' && typeof circle.y === 'number');
-                if (circles.length === 0) throw new Error('JSON пустой или некорректный');
-                
-                // Лог примеров координат для проверки (первые 3)
-                console.log('Круги загружены из circles_export.json:', circles.length, 'кругов');
-                console.log('Примеры координат (x,y):', circles.slice(0, 3).map(c => `ID ${c.id}: (${c.x}, ${c.y})`));
-            } catch (e) {
-                console.warn('Не удалось загрузить circles_export.json, используем дефолтные круги:', e.message);
-                circles = [
-                    { id: 'Круг1', x: 25, y: 25 },   // 25% слева, 25% сверху
-                    { id: 'Круг2', x: 75, y: 25 },   // 75% слева, 25% сверху
-                    { id: 'Круг3', x: 25, y: 75 },   // 25% слева, 75% сверху
-                    { id: 'Круг4', x: 75, y: 75 },   // 75% слева, 75% сверху
-                    { id: 'Круг5', x: 50, y: 50 }    // Центр
-                ];
-                console.log('Используем дефолтные круги:', circles.length);
-            }
-            drawCircles();
+       async function loadCircles() {
+    try {
+        console.log('Пытаюсь загрузить circles_export.json...');
+        const response = await fetch('https://raw.githubusercontent.com/oluneva/my_site/main/circles_export.json');
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        
+        circlesData = await response.json();
+        console.log('Круги загружены из circles_export.json:', circlesData.length, 'кругов');
+        if (circlesData.length > 0) {
+            console.log('Примеры координат (x,y):', circlesData.slice(0, 3).map(c => `ID ${c.id}: (${c.x}, ${c.y})`));
         }
+        
+        // Загрузка изображения и рисование кругов
+        await loadImageAndDrawCircles();
+    } catch (e) {
+        console.error('Ошибка загрузки кругов:', e.message);
+    }
+}
+
+async function loadImageAndDrawCircles() {
+    const canvas = document.getElementById('plantCanvas');  // Предполагаю ID канваса
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    
+    img.onload = () => {
+        console.log('Изображение загружено, рисую круги...');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+        
+        // Рисуем круги
+        drawCircles(ctx, circlesData);
+    };
+    
+    img.onerror = () => {
+        console.error('Ошибка загрузки изображения plant_image.jpg');
+    };
+    
+    img.src = 'images/plant_image.jpg';  // Проверьте путь!
+}
+
+function drawCircles(ctx, circles) {
+    console.log('Рисую', circles.length, 'кругов...');
+    circles.forEach(circle => {
+        console.log(`Рисую круг ${circle.id} на (${circle.x}, ${circle.y})`);
+        ctx.beginPath();
+        ctx.arc(circle.x, circle.y, 10, 0, 2 * Math.PI);  // Радиус 10px, цвет по умолчанию
+        ctx.fillStyle = 'red';  // Красные круги для видимости
+        ctx.fill();
+    });
+    console.log('Круги нарисованы.');
+}
 
         // Функция загрузки данных из CSV
         async function loadCSV() {
@@ -307,33 +334,7 @@
             }
         }
 
-        // Функция рисования кругов
-        function drawCircles() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            circles.forEach(circle => {
-                const x = (circle.x / 100) * canvas.width;
-                const y = (circle.y / 100) * canvas.height;
-                const radius = Math.min(canvas.width, canvas.height) * 0.05; // Радиус 5% от меньшей стороны
-                ctx.beginPath();
-                ctx.arc(x, y, radius, 0, 2 * Math.PI);
-                if (isBlinking && blinkingCircleIds.includes(circle.id)) {
-                    ctx.fillStyle = Math.sin(Date.now() * 0.01) > 0 ? 'yellow' : 'red'; // Мигающий желтый/красный
-                } else {
-                    ctx.fillStyle = 'blue'; // Синий по умолчанию
-                }
-                ctx.fill();
-                ctx.strokeStyle = 'black';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-                // Текст ID круга
-                ctx.fillStyle = 'white';
-                ctx.font = `${radius * 0.4}px Arial`;
-                ctx.textAlign = 'center';
-                ctx.fillText(circle.id, x, y + radius * 0.1);
-            });
-        }
-
-        // Функции мигания
+         // Функции мигания
         function startBlinking() {
             if (blinkInterval) clearInterval(blinkInterval);
             isBlinking = true;
@@ -363,4 +364,5 @@
     </script>
 </body>
 </html>
+
 

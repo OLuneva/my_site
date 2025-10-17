@@ -16,9 +16,12 @@
             height: 100vh;
         }
         #leftPanel {
-            flex: 1,25; /* Левая панель занимает 75% ширины */
+            flex: 1,5; /* Левая панель занимает 75% ширины */
             /* Убрал background-image, так как изображение теперь рисуется на канвасе */
             background-color: #77c98c; /* Бледно-зеленый подложка под изображением */
+            background-size: contain; /* Пропорциональное масштабирование без искажения, изображение помещается целиком, пустые места заполняются фоном */
+            background-repeat: no-repeat;
+            background-position: center;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -30,7 +33,7 @@
             display: block;
         }
         #rightPanel {
-            flex: 0.4; /* ширина правой панели */
+            flex: 0.25; /* ширина правой панели */
             background-color: #77c98c; /* Бледно-зеленый, как общий фон */
             padding: 15px; /* Уменьшенный padding */
             display: flex;
@@ -372,6 +375,7 @@
     </script>
 </body>
 </html>
+
 
 
 

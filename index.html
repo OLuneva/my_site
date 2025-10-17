@@ -7,9 +7,9 @@
         body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f0f0f0; }
         #container { display: flex; flex-direction: column; align-items: center; }
         #filtersAndControls { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 20px; }
-        .labels-row { display: flex; gap: 10px; justify-content: center; }
+        .labels-row { display: flex; gap: 10px; justify-content: flex-start; width: 100%; max-width: 800px; }
         .labels-row label { font-weight: bold; flex: 1; text-align: center; }
-        .filters-row { display: flex; gap: 10px; justify-content: center; align-items: center; }
+        .filters-row { display: flex; gap: 10px; justify-content: flex-start; width: 100%; max-width: 800px; align-items: center; }
         .filters-row select { padding: 5px; flex: 1; }
         .filters-row button { padding: 10px; }
         #subgroupGroup { display: none; }
@@ -198,79 +198,98 @@
         // Рендеринг кругов (всегда отображаются)
         function drawCircles() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            if (background.complete) {
+
+            // Рисуем фон, если загружен
+            if (background.complete && background.naturalWidth > 0) {
                 ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+            } else {
+                ctx.fillStyle = '#f0f0f0';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
             }
+
+            // Рисуем все круги
             circles.forEach(circle => {
                 ctx.beginPath();
-                ctx.arc(circle.x, circle.y, 7, 0, 2 * Math.PI);  // Радиус уменьшен в ~3 раза (20 / 3 ≈ 6.67, округлено до 7)
-                if (isBlinking && blinkingCircleIds.includes(circle.id)) {
-                    ctx.fillStyle = 'red';
-                } else {
-                    ctx.fillStyle = 'rgba(0, 128, 0, 0.5)';
-                }
-                ctx.fill();
-                ctx.strokeStyle = 'black';
+                ctx.arc(circle.x, circle.y, 20, 0, 2 * Math.PI);
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 2;
                 ctx.stroke();
-                // Названия кругов убраны
+                ctx.fillStyle = 'rgba(0, 0, 255, 0.3)'; // Прозрачный синий
+                ctx.fill();
+
+                // Если круг мигает, меняем цвет
+                if (blinkingCircleIds.includes(circle.id)) {
+                    ctx.fillStyle = isBlinking ? 'rgba(255, 0, 0, 0.5)' : 'rgba(0, 0, 255, 0.3)';
+                    ctx.fill();
+                }
+
+                // Добавляем текст с ID
+                ctx.fillStyle = '#000';
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(circle.id, circle.x, circle.y + 5);
             });
         }
 
-        // Мигание кругов
-        function blinkCircles(ids) {
-            if (isBlinking) {
-                clearInterval(blinkInterval);
-                isBlinking = false;
-            }
-            blinkingCircleIds = ids;
-            if (blinkingCircleIds.length === 0) {
-                document.getElementById('status').textContent = 'Не найдено кругов для выбранных фильтров.';
-                return;
-            }
+        // Функция для запуска мигания кругов
+        function startBlinking(circleIds) {
+            blinkingCircleIds = circleIds;
+            if (blinkInterval) clearInterval(blinkInterval);
             isBlinking = true;
-            let blinkCount = 0;
             blinkInterval = setInterval(() => {
+                isBlinking = !isBlinking;
                 drawCircles();
-                blinkCount++;
-                if (blinkCount >= 6) {  // 3 секунды (6 раз по 500мс)
-                    clearInterval(blinkInterval);
-                    isBlinking = false;
-                    blinkingCircleIds = [];
-                    drawCircles();
-                }
-            }, 500);
+            }, 500); // Мигание каждые 500мс
         }
+
+        // Функция для остановки мигания
+        function stopBlinking() {
+            if (blinkInterval) {
+                clearInterval(blinkInterval);
+                blinkInterval = null;
+            }
+            blinkingCircleIds = [];
+            isBlinking = false;
+            drawCircles();
+        }
+
+        // Обработчик кнопки "Найти растение"
+        document.getElementById('findPlantBtn').addEventListener('click', () => {
+            // В пользовательском режиме subgroup не требуется, так как фильтр скрыт
+            // Находим все круги, соответствующие выбранным фильтрам
+            const filteredPlants = data.filter(plant => {
+                return (!selectedFilters.class || plant.class === selectedFilters.class) &&
+                       (!selectedFilters.subclass || plant.subclass === selectedFilters.subclass) &&
+                       (!selectedFilters.type || plant.type === selectedFilters.type) &&
+                       (!selectedFilters.subtype || plant.subtype === selectedFilters.subtype) &&
+                       (!selectedFilters.group || plant.group === selectedFilters.group);
+            });
+
+            const circleIds = [...new Set(filteredPlants.map(plant => plant.subgroup))];
+            if (circleIds.length > 0) {
+                startBlinking(circleIds);
+                document.getElementById('status').textContent = `Найдено ${circleIds.length} кругов: ${circleIds.join(', ')}`;
+            } else {
+                stopBlinking();
+                document.getElementById('status').textContent = 'Растения не найдены.';
+            }
+        });
+
+        // Обработчик кнопки "Перейти в режим разработчика"
+        document.getElementById('switchToDeveloperBtn').addEventListener('click', () => {
+            window.location.href = 'https://oluneva.github.io/my_site/developer.html';
+        });
 
         // Инициализация
         async function init() {
-            await Promise.all([loadCircles(), loadCSV()]);
+            await loadCircles();
+            await loadCSV();
             populateFilters();
             drawCircles();
-            background.onload = drawCircles;
+            document.getElementById('status').textContent = 'Инициализация завершена.';
         }
 
         init();
-
-        // Кнопка "Найти растение"
-        document.getElementById('findPlantBtn').addEventListener('click', () => {
-            // Фильтруем данные по выбранным фильтрам
-            const filteredData = data.filter(d => {
-                return (!selectedFilters.class || d.class === selectedFilters.class) &&
-                       (!selectedFilters.subclass || d.subclass === selectedFilters.subclass) &&
-                       (!selectedFilters.type || d.type === selectedFilters.type) &&
-                       (!selectedFilters.subtype || d.subtype === selectedFilters.subtype) &&
-                       (!selectedFilters.group || d.group === selectedFilters.group);
-            });
-            // Собираем уникальные subgroup (Круги) из отфильтрованных данных
-            const uniqueSubgroups = [...new Set(filteredData.map(d => d.subgroup))];
-            blinkCircles(uniqueSubgroups);
-        });
-
-        // Кнопка перехода в режим разработчика - перенаправление на developer.html из репозитария
-        document.getElementById('switchToDeveloperBtn').addEventListener('click', () => {
-            // Предполагаем, что репозитарий опубликован как GitHub Pages по адресу https://oluneva.github.io/my_site/
-            window.location.href = 'https://oluneva.github.io/my_site/developer.html';
-        });
     </script>
 </body>
 </html>

@@ -204,13 +204,18 @@ async function loadImageAndDrawCircles() {
     img.src = 'images/plant_image.jpg';  // Проверьте путь!
 }
 
-function drawCircles(ctx, circles) {
-    console.log('Рисую', circles.length, 'кругов...');
-    circles.forEach(circle => {
-        console.log(`Рисую круг ${circle.id} на (${circle.x}, ${circle.y})`);
+function drawCircles() {
+    if (!img) return;  // Если изображение не загружено, не рисуем
+    ctx.drawImage(img, 0, 0);  // Перерисовываем изображение
+    console.log('Рисую', circlesData.length, 'кругов...');
+    circlesData.forEach(circle => {
         ctx.beginPath();
-        ctx.arc(circle.x, circle.y, 10, 0, 2 * Math.PI);  // Радиус 10px, цвет по умолчанию
-        ctx.fillStyle = 'red';  // Красные круги для видимости
+        ctx.arc(circle.x, circle.y, 10, 0, 2 * Math.PI);  // Радиус 10px
+        if (blinkingCircleIds.includes(circle.id) && isBlinking && blinkState) {
+            ctx.fillStyle = 'red';  // Мигающие круги красные
+        } else {
+            ctx.fillStyle = 'green';  // Обычные круги зелёные
+        }
         ctx.fill();
     });
     console.log('Круги нарисованы.');
@@ -364,5 +369,6 @@ function drawCircles(ctx, circles) {
     </script>
 </body>
 </html>
+
 
 

@@ -191,23 +191,28 @@
 
         // Функция загрузки данных из CSV
         async function loadCSV() {
-            try {
-                console.log('Пытаюсь загрузить Plants.csv...');
-                const response = await fetch('https://raw.githubusercontent.com/oluneva/my_site/main/Plants.csv');
-                if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                const csvText = await response.text();
-                data = parseCSV(csvText);
-                console.log('CSV загружено:', data.length, 'записей');
-                if (data.length > 0) {
-                    console.log('Примеры данных:', data.slice(0, 3));
-                }
-                populateFilters();
-                csvLoaded = true;
-            } catch (e) {
-                console.error('Ошибка загрузки CSV:', e.message);
-                alert('Не удалось загрузить данные растений. Проверьте консоль браузера.');
-            }
+    try {
+        console.log('Пытаюсь загрузить Plants.csv...');
+        const response = await fetch('https://raw.githubusercontent.com/oluneva/my_site/main/Plants.csv');
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        
+        // Декодируем как Windows-1251 (CP1251), чтобы корректно прочитать русские буквы
+        const buffer = await response.arrayBuffer();
+        const decoder = new TextDecoder('windows-1251');  // Для CP1251; если другая кодировка, замените (например, 'iso-8859-5')
+        const csvText = decoder.decode(buffer);
+        
+        data = parseCSV(csvText);
+        console.log('CSV загружено:', data.length, 'записей');
+        if (data.length > 0) {
+            console.log('Примеры данных:', data.slice(0, 3));
         }
+        populateFilters();
+        csvLoaded = true;
+    } catch (e) {
+        console.error('Ошибка загрузки CSV:', e.message);
+        alert('Не удалось загрузить данные растений. Проверьте консоль браузера.');
+    }
+}
 
         // Функция парсинга CSV с разделителем ";"
         function parseCSV(csvText) {
@@ -358,3 +363,4 @@
     </script>
 </body>
 </html>
+

@@ -2,8 +2,10 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Добавлено: предотвращает масштабирование на мобильных и в iframe (как на GitHub Pages) -->
     <title>Пользовательский режим - Просмотр кругов</title>
     <style>
+        /* Стили без изменений */
         html, body {
             height: 100%;
             margin: 0;
@@ -290,7 +292,6 @@
             // Обработчики изменения
             classSelect.addEventListener('change', () => { selectedFilters.class = classSelect.value; filterData(); });
             subclassSelect.addEventListener('change', () => { selectedFilters.subclass = subclassSelect.value; filterData(); });
-            typeSelect.addEventListener('change', () => { selectedFilters.type = typeSelect.value; filterData(); });
             typeSelect.addEventListener('change', () => { selectedFilters.type = typeSelect.value; filterData(); });
             subtypeSelect.addEventListener('change', () => { selectedFilters.subtype = subtypeSelect.value; filterData(); });
             groupSelect.addEventListener('change', () => { selectedFilters.group = groupSelect.value; filterData(); });

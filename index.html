@@ -1,3 +1,1125 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Пользовательский режим - Просмотр кругов</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f0f0f0; }
+        #container { display: flex; flex-direction: column; align-items: center; }
+        #filters { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+        select { padding: 5px; }
+        #subgroupSelect { display: none; } /* Скрываем селектор Круга по умолчанию */
+        #controls { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+        button { padding: 10px; }
+        #canvas { border: 1px solid #000; }
+        #status { margin-top: 10px; font-size: 14px; color: #555; }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <h1 id="modeTitle">Пользовательский режим</h1>
+        <div id="filters">
+            <select id="classSelect"><option>Не выбрано</option></select>
+            <select id="subclassSelect"><option>Не выбрано</option></select>
+            <select id="typeSelect"><option>Не выбрано</option></select>
+            <select id="subtypeSelect"><option>Не выбрано</option></select>
+            <select id="groupSelect"><option>Не выбрано</option></select>
+            <select id="subgroupSelect"><option>Не выбрано</option></select> <!-- Скрыт в пользовательском режиме -->
+        </div>
+        <div id="controls">
+            <button id="findPlantBtn">Найти растение</button>
+            <button id="switchToDeveloperBtn">Перейти в режим разработчика</button>
+        </div>
+        <canvas id="canvas" width="800" height="600"></canvas>
+        <div id="status">Загрузка данных...</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const background = new Image();
+        background.src = 'https://github.com/oluneva/my_site/raw/main/my-image.jpg';
+
+        let circles = [];
+        let data = [];
+        let selectedFilters = { class: '', subclass: '', type: '', subtype: '', group: '', subgroup: '' };
+        let blinkingCircleId = null;
+        let blinkInterval = null;
+        let isBlinking = false;
+        let csvLoaded = false;
+
+        // Функция загрузки кругов из circles_export.json
+        async function loadCircles() {
+            try {
+                console.log('Пытаюсь загрузить circles_export.json...');
+                const response = await fetch('https://raw.githubusercontent.com/oluneva/my_site/main/circles_export.json');
+                if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                circles = await response.json();
+                circles = circles.filter(circle => circle && typeof circle.id === 'string' && circle.id.trim() !== '' && typeof circle.x === 'number' && typeof circle.y === 'number');
+                if (circles.length === 0) throw new Error('JSON пустой или некорректный');
+                console.log('Круги загружены из circles_export.json:', circles.length, 'кругов');
+                document.getElementById('status').textContent = `Загружено ${circles.length} кругов.`;
+            } catch (e) {
+                console.warn('Не удалось загрузить circles_export.json, используем дефолтные круги:', e.message);
+                circles = [
+                    { id: 'Круг1', x: 100, y: 100 },
+                    { id: 'Круг2', x: 200, y: 200 },
+                    { id: 'Круг3', x: 300, y: 300 }
+                ];
+                document.getElementById('status').textContent = 'Используются демо-круги.';
+            }
+        }
+
+        // Загрузка и парсинг CSV с разделителем ";"
+        async function loadCSV() {
+            try {
+                console.log('Пытаюсь загрузить Plants.csv...');
+                const response = await fetch('https://raw.githubusercontent.com/oluneva/my_site/main/Plants.csv');
+                if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                const buffer = await response.arrayBuffer();
+                const decoder = new TextDecoder('windows-1251');  // Измените на 'utf-8', если символы искажены
+                const csvText = decoder.decode(buffer);
+                console.log('Сырой текст CSV (первые 500 символов):', csvText.substring(0, 500));
+
+                // Парсинг с разделителем ";"
+                const rows = csvText.split('\n').filter(row => row.trim() !== '');
+                if (rows.length < 2) throw new Error('CSV содержит менее 2 строк (заголовки + данные)');
+                const headers = rows[0].split(';').map(h => h.replace(/^"|"$/g, '').trim());
+                console.log('Заголовки:', headers);
+                if (headers.length !== 7 || !headers.includes('Класс') || !headers.includes('Круг') || !headers.includes('Однозначно')) {
+                    throw new Error('Заголовки CSV не соответствуют ожидаемым: ["Класс", "Семейство", "Род", "Вид", "Сорт", "Круг", "Однозначно"]');
+                }
+
+                data = rows.slice(1).map(row => {
+                    const cells = row.split(';').map(cell => cell.replace(/^"|"$/g, '').trim());
+                    if (cells.length !== 7) return null;
+                    return {
+                        class: cells[0],     // Класс
+                        subclass: cells[1],  // Семейство
+                        type: cells[2],      // Род
+                        subtype: cells[3],   // Вид
+                        group: cells[4],     // Сорт
+                        subgroup: cells[5],  // Круг
+                        unique: cells[6]     // Однозначно (скрытое поле)
+                    };
+                }).filter(item => item && item.class && item.subgroup && item.unique);
+                console.log('Данные загружены из CSV:', data.length, 'записей');
+                csvLoaded = true;
+                document.getElementById('status').textContent += ' Данные фильтров загружены.';
+            } catch (e) {
+                console.warn('Ошибка загрузки/парсинга CSV, используем демо-данные для фильтров:', e.message);
+                data = [
+                    { class: 'Класс1', subclass: 'Семейство1', type: 'Род1', subtype: 'Вид1', group: 'Сорт1', subgroup: 'Круг1', unique: 'Уник1' },
+                    { class: 'Класс1', subclass: 'Семейство1', type: 'Род1', subtype: 'Вид1', group: 'Сорт1', subgroup: 'Круг2', unique: 'Уник2' },  // Для теста
+                    { class: 'Класс2', subclass: 'Семейство2', type: 'Род2', subtype: 'Вид2', group: 'Сорт2', subgroup: 'Круг3', unique: 'Уник3' }
+                ];
+                document.getElementById('status').textContent += ' Используются демо-данные для фильтров.';
+            }
+        }
+
+        // Заполнение фильтров
+        function populateFilters() {
+            const classSelect = document.getElementById('classSelect');
+            const subclassSelect = document.getElementById('subclassSelect');
+            const typeSelect = document.getElementById('typeSelect');
+            const subtypeSelect = document.getElementById('subtypeSelect');
+            const groupSelect = document.getElementById('groupSelect');
+            const subgroupSelect = document.getElementById('subgroupSelect');
+
+            // Функция для обновления всех фильтров на основе текущих selectedFilters
+            function updateAllFilters() {
+                // Фильтруем данные на основе выбранных фильтров (только если выбрано что-то кроме пустой строки)
+                const filteredData = data.filter(d => {
+                    return (!selectedFilters.class || d.class === selectedFilters.class) &&
+                           (!selectedFilters.subclass || d.subclass === selectedFilters.subclass) &&
+                           (!selectedFilters.type || d.type === selectedFilters.type) &&
+                           (!selectedFilters.subtype || d.subtype === selectedFilters.subtype) &&
+                           (!selectedFilters.group || d.group === selectedFilters.group) &&
+                           (!selectedFilters.subgroup || d.subgroup === selectedFilters.subgroup);
+                });
+
+                // Обновляем каждый селект
+                const classes = [...new Set(filteredData.map(d => d.class))].sort();
+                classSelect.innerHTML = '<option value="">Не выбрано</option>' + classes.map(c => `<option value="${c}">${c}</option>`).join('');
+                classSelect.value = selectedFilters.class;
+
+                const subclasses = [...new Set(filteredData.map(d => d.subclass))].sort();
+                subclassSelect.innerHTML = '<option value="">Не выбрано</option>' + subclasses.map(c => `<option value="${c}">${c}</option>`).join('');
+                subclassSelect.value = selectedFilters.subclass;
+
+                const types = [...new Set(filteredData.map(d => d.type))].sort();
+                typeSelect.innerHTML = '<option value="">Не выбрано</option>' + types.map(c => `<option value="${c}">${c}</option>`).join('');
+                typeSelect.value = selectedFilters.type;
+
+                const subtypes = [...new Set(filteredData.map(d => d.subtype))].sort();
+                subtypeSelect.innerHTML = '<option value="">Не выбрано</option>' + subtypes.map(c => `<option value="${c}">${c}</option>`).join('');
+                subtypeSelect.value = selectedFilters.subtype;
+
+                const groups = [...new Set(filteredData.map(d => d.group))].sort();
+                groupSelect.innerHTML = '<option value="">Не выбрано</option>' + groups.map(c => `<option value="${c}">${c}</option>`).join('');
+                groupSelect.value = selectedFilters.group;
+
+                const subgroups = [...new Set(filteredData.map(d => d.subgroup))].sort();
+                subgroupSelect.innerHTML = '<option value="">Не выбрано</option>' + subgroups.map(c => `<option value="${c}">${c}</option>`).join('');
+                subgroupSelect.value = selectedFilters.subgroup;
+            }
+
+            // Изначально все фильтры на "Не выбрано", показываем все
+            updateAllFilters();
+
+            // Обработчики изменений для каждого селекта
+            classSelect.addEventListener('change', () => {
+                selectedFilters.class = classSelect.value;
+                updateAllFilters();
+            });
+
+            subclassSelect.addEventListener('change', () => {
+                selectedFilters.subclass = subclassSelect.value;
+                updateAllFilters();
+            });
+
+            typeSelect.addEventListener('change', () => {
+                selectedFilters.type = typeSelect.value;
+                updateAllFilters();
+            });
+
+            subtypeSelect.addEventListener('change', () => {
+                selectedFilters.subtype = subtypeSelect.value;
+                updateAllFilters();
+            });
+
+            groupSelect.addEventListener('change', () => {
+                selectedFilters.group = groupSelect.value;
+                updateAllFilters();
+            });
+
+            subgroupSelect.addEventListener('change', () => {
+                selectedFilters.subgroup = subgroupSelect.value;
+                updateAllFilters();
+            });
+        }
+
+        // Рендеринг кругов (всегда отображаются)
+        function drawCircles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (background.complete) {
+                ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+            }
+            circles.forEach(circle => {
+                ctx.beginPath();
+                ctx.arc(circle.x, circle.y, 7, 0, 2 * Math.PI);  // Радиус уменьшен в ~3 раза (20 / 3 ≈ 6.67, округлено до 7)
+                if (isBlinking && blinkingCircleId === circle.id) {
+                    ctx.fillStyle = 'red';
+                } else {
+                    ctx.fillStyle = 'rgba(0, 128, 0, 0.5)';
+                }
+                ctx.fill();
+                ctx.strokeStyle = 'black';
+                ctx.stroke();
+                // Названия кругов убраны
+            });
+        }
+
+        // Мигание круга
+        function blinkCircle(id) {
+            if (isBlinking) {
+                clearInterval(blinkInterval);
+                isBlinking = false;
+            }
+            const circle = circles.find(c => c.id === id);
+            if (!circle) {
+                document.getElementById('status').textContent = 'Круг с таким ID не найден.';
+                return;
+            }
+            blinkingCircleId = id;
+            isBlinking = true;
+            let blinkCount = 0;
+            blinkInterval = setInterval(() => {
+                drawCircles();
+                blinkCount++;
+                if (blinkCount >= 6) {  // 3 секунды (6 раз по 500мс)
+                    clearInterval(blinkInterval);
+                    isBlinking = false;
+                    blinkingCircleId = null;
+                    drawCircles();
+                }
+            }, 500);
+        }
+
+        // Инициализация
+        async function init() {
+            await Promise.all([loadCircles(), loadCSV()]);
+            populateFilters();
+            drawCircles();
+            background.onload = drawCircles;
+        }
+
+        init();
+
+        // Кнопка "Найти растение"
+        document.getElementById('findPlantBtn').addEventListener('click', () => {
+            if (!selectedFilters.group) {
+                document.getElementById('status').textContent = 'Сначала выберите Сорт в фильтре.';
+                return;
+            }
+            // Найти значение в поле "Однозначно" по выбранному group
+            const matchingData = data.find(d => d.group === selectedFilters.group);
+            if (!matchingData || !matchingData.unique) {
+                document.getElementById('status').textContent = 'Не найдено соответствующее значение для поиска.';
+                return;
+            }
+            blinkCircle(matchingData.unique);
+        });
+
+        // Кнопка перехода в режим разработчика - перенаправление на developer.html из репозитария
+        document.getElementById('switchToDeveloperBtn').addEventListener('click', () => {
+            // Предполагаем, что репозитарий опубликован как GitHub Pages по адресу https://oluneva.github.io/my_site/
+            window.location.href = 'https://oluneva.github.io/my_site/developer.html';
+        });
+    </script>
+</body>
+</html>
+
+Изменения:
+Предоставлен только код пользовательского режима (как и запрошено).
+Кнопка "Перейти в режим разработчика" теперь перенаправляет на https://oluneva.github.io/my_site/developer.html (предполагая, что репозитарий опубликован как GitHub Pages). Если URL неправильный, замените на актуальный (например, если не Pages, то на raw.githubusercontent.com, но это не запустит HTML, а покажет код — тогда лучше использовать Pages или другой хостинг).
+Логика "Найти растение" осталась прежней: требует выбора "Сорт" (group), ищет по нему unique и мигает круг с этим ID. (В пользовательском режиме "Круг" скрыт, так что выбор "Круга" не требуется, как обсуждалось ранее.)
+Если требуется динамическая загрузка кода developer без перенаправления (например, через fetch и замену содержимого страницы), это возможно, но сложнее и менее надежно — дайте знать, если нужно реализовать именно так. Если URL для developer.html другой, уточните!
+
+код пришли еще раз.
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Пользовательский режим - Просмотр кругов</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f0f0f0; }
+        #container { display: flex; flex-direction: column; align-items: center; }
+        #filters { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+        select { padding: 5px; }
+        #subgroupSelect { display: none; } /* Скрываем селектор Круга по умолчанию */
+        #controls { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+        button { padding: 10px; }
+        #canvas { border: 1px solid #000; }
+        #status { margin-top: 10px; font-size: 14px; color: #555; }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <h1 id="modeTitle">Пользовательский режим</h1>
+        <div id="filters">
+            <select id="classSelect"><option>Не выбрано</option></select>
+            <select id="subclassSelect"><option>Не выбрано</option></select>
+            <select id="typeSelect"><option>Не выбрано</option></select>
+            <select id="subtypeSelect"><option>Не выбрано</option></select>
+            <select id="groupSelect"><option>Не выбрано</option></select>
+            <select id="subgroupSelect"><option>Не выбрано</option></select> <!-- Скрыт в пользовательском режиме -->
+        </div>
+        <div id="controls">
+            <button id="findPlantBtn">Найти растение</button>
+            <button id="switchToDeveloperBtn">Перейти в режим разработчика</button>
+        </div>
+        <canvas id="canvas" width="800" height="600"></canvas>
+        <div id="status">Загрузка данных...</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const background = new Image();
+        background.src = 'https://github.com/oluneva/my_site/raw/main/my-image.jpg';
+
+        let circles = [];
+        let data = [];
+        let selectedFilters = { class: '', subclass: '', type: '', subtype: '', group: '', subgroup: '' };
+        let blinkingCircleId = null;
+        let blinkInterval = null;
+        let isBlinking = false;
+        let csvLoaded = false;
+
+        // Функция загрузки кругов из circles_export.json
+        async function loadCircles() {
+            try {
+                console.log('Пытаюсь загрузить circles_export.json...');
+                const response = await fetch('https://raw.githubusercontent.com/oluneva/my_site/main/circles_export.json');
+                if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                circles = await response.json();
+                circles = circles.filter(circle => circle && typeof circle.id === 'string' && circle.id.trim() !== '' && typeof circle.x === 'number' && typeof circle.y === 'number');
+                if (circles.length === 0) throw new Error('JSON пустой или некорректный');
+                console.log('Круги загружены из circles_export.json:', circles.length, 'кругов');
+                document.getElementById('status').textContent = `Загружено ${circles.length} кругов.`;
+            } catch (e) {
+                console.warn('Не удалось загрузить circles_export.json, используем дефолтные круги:', e.message);
+                circles = [
+                    { id: 'Круг1', x: 100, y: 100 },
+                    { id: 'Круг2', x: 200, y: 200 },
+                    { id: 'Круг3', x: 300, y: 300 }
+                ];
+                document.getElementById('status').textContent = 'Используются демо-круги.';
+            }
+        }
+
+        // Загрузка и парсинг CSV с разделителем ";"
+        async function loadCSV() {
+            try {
+                console.log('Пытаюсь загрузить Plants.csv...');
+                const response = await fetch('https://raw.githubusercontent.com/oluneva/my_site/main/Plants.csv');
+                if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                const buffer = await response.arrayBuffer();
+                const decoder = new TextDecoder('windows-1251');  // Измените на 'utf-8', если символы искажены
+                const csvText = decoder.decode(buffer);
+                console.log('Сырой текст CSV (первые 500 символов):', csvText.substring(0, 500));
+
+                // Парсинг с разделителем ";"
+                const rows = csvText.split('\n').filter(row => row.trim() !== '');
+                if (rows.length < 2) throw new Error('CSV содержит менее 2 строк (заголовки + данные)');
+                const headers = rows[0].split(';').map(h => h.replace(/^"|"$/g, '').trim());
+                console.log('Заголовки:', headers);
+                if (headers.length !== 7 || !headers.includes('Класс') || !headers.includes('Круг') || !headers.includes('Однозначно')) {
+                    throw new Error('Заголовки CSV не соответствуют ожидаемым: ["Класс", "Семейство", "Род", "Вид", "Сорт", "Круг", "Однозначно"]');
+                }
+
+                data = rows.slice(1).map(row => {
+                    const cells = row.split(';').map(cell => cell.replace(/^"|"$/g, '').trim());
+                    if (cells.length !== 7) return null;
+                    return {
+                        class: cells[0],     // Класс
+                        subclass: cells[1],  // Семейство
+                        type: cells[2],      // Род
+                        subtype: cells[3],   // Вид
+                        group: cells[4],     // Сорт
+                        subgroup: cells[5],  // Круг
+                        unique: cells[6]     // Однозначно (скрытое поле)
+                    };
+                }).filter(item => item && item.class && item.subgroup && item.unique);
+                console.log('Данные загружены из CSV:', data.length, 'записей');
+                csvLoaded = true;
+                document.getElementById('status').textContent += ' Данные фильтров загружены.';
+            } catch (e) {
+                console.warn('Ошибка загрузки/парсинга CSV, используем демо-данные для фильтров:', e.message);
+                data = [
+                    { class: 'Класс1', subclass: 'Семейство1', type: 'Род1', subtype: 'Вид1', group: 'Сорт1', subgroup: 'Круг1', unique: 'Уник1' },
+                    { class: 'Класс1', subclass: 'Семейство1', type: 'Род1', subtype: 'Вид1', group: 'Сорт1', subgroup: 'Круг2', unique: 'Уник2' },  // Для теста
+                    { class: 'Класс2', subclass: 'Семейство2', type: 'Род2', subtype: 'Вид2', group: 'Сорт2', subgroup: 'Круг3', unique: 'Уник3' }
+                ];
+                document.getElementById('status').textContent += ' Используются демо-данные для фильтров.';
+            }
+        }
+
+        // Заполнение фильтров
+        function populateFilters() {
+            const classSelect = document.getElementById('classSelect');
+            const subclassSelect = document.getElementById('subclassSelect');
+            const typeSelect = document.getElementById('typeSelect');
+            const subtypeSelect = document.getElementById('subtypeSelect');
+            const groupSelect = document.getElementById('groupSelect');
+            const subgroupSelect = document.getElementById('subgroupSelect');
+
+            // Функция для обновления всех фильтров на основе текущих selectedFilters
+            function updateAllFilters() {
+                // Фильтруем данные на основе выбранных фильтров (только если выбрано что-то кроме пустой строки)
+                const filteredData = data.filter(d => {
+                    return (!selectedFilters.class || d.class === selectedFilters.class) &&
+                           (!selectedFilters.subclass || d.subclass === selectedFilters.subclass) &&
+                           (!selectedFilters.type || d.type === selectedFilters.type) &&
+                           (!selectedFilters.subtype || d.subtype === selectedFilters.subtype) &&
+                           (!selectedFilters.group || d.group === selectedFilters.group) &&
+                           (!selectedFilters.subgroup || d.subgroup === selectedFilters.subgroup);
+                });
+
+                // Обновляем каждый селект
+                const classes = [...new Set(filteredData.map(d => d.class))].sort();
+                classSelect.innerHTML = '<option value="">Не выбрано</option>' + classes.map(c => `<option value="${c}">${c}</option>`).join('');
+                classSelect.value = selectedFilters.class;
+
+                const subclasses = [...new Set(filteredData.map(d => d.subclass))].sort();
+                subclassSelect.innerHTML = '<option value="">Не выбрано</option>' + subclasses.map(c => `<option value="${c}">${c}</option>`).join('');
+                subclassSelect.value = selectedFilters.subclass;
+
+                const types = [...new Set(filteredData.map(d => d.type))].sort();
+                typeSelect.innerHTML = '<option value="">Не выбрано</option>' + types.map(c => `<option value="${c}">${c}</option>`).join('');
+                typeSelect.value = selectedFilters.type;
+
+                const subtypes = [...new Set(filteredData.map(d => d.subtype))].sort();
+                subtypeSelect.innerHTML = '<option value="">Не выбрано</option>' + subtypes.map(c => `<option value="${c}">${c}</option>`).join('');
+                subtypeSelect.value = selectedFilters.subtype;
+
+                const groups = [...new Set(filteredData.map(d => d.group))].sort();
+                groupSelect.innerHTML = '<option value="">Не выбрано</option>' + groups.map(c => `<option value="${c}">${c}</option>`).join('');
+                groupSelect.value = selectedFilters.group;
+
+                const subgroups = [...new Set(filteredData.map(d => d.subgroup))].sort();
+                subgroupSelect.innerHTML = '<option value="">Не выбрано</option>' + subgroups.map(c => `<option value="${c}">${c}</option>`).join('');
+                subgroupSelect.value = selectedFilters.subgroup;
+            }
+
+            // Изначально все фильтры на "Не выбрано", показываем все
+            updateAllFilters();
+
+            // Обработчики изменений для каждого селекта
+            classSelect.addEventListener('change', () => {
+                selectedFilters.class = classSelect.value;
+                updateAllFilters();
+            });
+
+            subclassSelect.addEventListener('change', () => {
+                selectedFilters.subclass = subclassSelect.value;
+                updateAllFilters();
+            });
+
+            typeSelect.addEventListener('change', () => {
+                selectedFilters.type = typeSelect.value;
+                updateAllFilters();
+            });
+
+            subtypeSelect.addEventListener('change', () => {
+                selectedFilters.subtype = subtypeSelect.value;
+                updateAllFilters();
+            });
+
+            groupSelect.addEventListener('change', () => {
+                selectedFilters.group = groupSelect.value;
+                updateAllFilters();
+            });
+
+            subgroupSelect.addEventListener('change', () => {
+                selectedFilters.subgroup = subgroupSelect.value;
+                updateAllFilters();
+            });
+        }
+
+        // Рендеринг кругов (всегда отображаются)
+        function drawCircles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (background.complete) {
+                ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+            }
+            circles.forEach(circle => {
+                ctx.beginPath();
+                ctx.arc(circle.x, circle.y, 7, 0, 2 * Math.PI);  // Радиус уменьшен в ~3 раза (20 / 3 ≈ 6.67, округлено до 7)
+                if (isBlinking && blinkingCircleId === circle.id) {
+                    ctx.fillStyle = 'red';
+                } else {
+                    ctx.fillStyle = 'rgba(0, 128, 0, 0.5)';
+                }
+                ctx.fill();
+                ctx.strokeStyle = 'black';
+                ctx.stroke();
+                // Названия кругов убраны
+            });
+        }
+
+        // Мигание круга
+        function blinkCircle(id) {
+            if (isBlinking) {
+                clearInterval(blinkInterval);
+                isBlinking = false;
+            }
+            const circle = circles.find(c => c.id === id);
+            if (!circle) {
+                document.getElementById('status').textContent = 'Круг с таким ID не найден.';
+                return;
+            }
+            blinkingCircleId = id;
+            isBlinking = true;
+            let blinkCount = 0;
+            blinkInterval = setInterval(() => {
+                drawCircles();
+                blinkCount++;
+                if (blinkCount >= 6) {  // 3 секунды (6 раз по 500мс)
+                    clearInterval(blinkInterval);
+                    isBlinking = false;
+                    blinkingCircleId = null;
+                    drawCircles();
+                }
+            }, 500);
+        }
+
+        // Инициализация
+        async function init() {
+            await Promise.all([loadCircles(), loadCSV()]);
+            populateFilters();
+            drawCircles();
+            background.onload = drawCircles;
+        }
+
+        init();
+
+        // Кнопка "Найти растение"
+        document.getElementById('findPlantBtn').addEventListener('click', () => {
+            if (!selectedFilters.group) {
+                document.getElementById('status').textContent = 'Сначала выберите Сорт в фильтре.';
+                return;
+            }
+            // Найти значение в поле "Однозначно" по выбранному group
+            const matchingData = data.find(d => d.group === selectedFilters.group);
+            if (!matchingData || !matchingData.unique) {
+                document.getElementById('status').textContent = 'Не найдено соответствующее значение для поиска.';
+                return;
+            }
+            blinkCircle(matchingData.unique);
+        });
+
+        // Кнопка перехода в режим разработчика - перенаправление на developer.html из репозитария
+        document.getElementById('switchToDeveloperBtn').addEventListener('click', () => {
+            // Предполагаем, что репозитарий опубликован как GitHub Pages по адресу https://oluneva.github.io/my_site/
+            window.location.href = 'https://oluneva.github.io/my_site/developer.html';
+        });
+    </script>
+</body>
+</html>
+
+Добрый день. Изменилась логика фильтров и поиска круга. Опишу правила поиска круга:
+
+У нас 5 фильтров и 2 фильтра скрыты. Фильтр "Однозначно" убери.
+Пользователь делает выбор значений из 5 фильтров, из 6 фильтра "Круг" - получаем имя круга, в зависимости от сделанного выбора в 5 фильтрах.
+Например, в поле "Сорт" значения: Сорт1 и Сорт2. Но предыдущие фильтры не выбраны, а на самом деле в таблице Plants.csv, есть несколько записей с Сорт1. Т.е. если пользователь, не установив предыдущие фильтры, выбирает Сорт1, то необходимо найти все круги, сооветствующие с записью Сорт1 в поле "Сорт1" - и сделать их мигающими.
+Если же выбран "Сорт1" и выбран фильтр, например, в поле Вид, то поиск круга надо сузить до записей с этими значениями.
+Исправь код, я проверю
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Пользовательский режим - Просмотр кругов</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f0f0f0; }
+        #container { display: flex; flex-direction: column; align-items: center; }
+        #filters { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+        select { padding: 5px; }
+        #subgroupSelect { display: none; } /* Скрываем селектор Круга */
+        #controls { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+        button { padding: 10px; }
+        #canvas { border: 1px solid #000; }
+        #status { margin-top: 10px; font-size: 14px; color: #555; }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <h1 id="modeTitle">Пользовательский режим</h1>
+        <div id="filters">
+            <select id="classSelect"><option>Не выбрано</option></select>
+            <select id="subclassSelect"><option>Не выбрано</option></select>
+            <select id="typeSelect"><option>Не выбрано</option></select>
+            <select id="subtypeSelect"><option>Не выбрано</option></select>
+            <select id="groupSelect"><option>Не выбрано</option></select>
+            <select id="subgroupSelect"><option>Не выбрано</option></select> <!-- Скрыт -->
+        </div>
+        <div id="controls">
+            <button id="findPlantBtn">Найти растение</button>
+            <button id="switchToDeveloperBtn">Перейти в режим разработчика</button>
+        </div>
+        <canvas id="canvas" width="800" height="600"></canvas>
+        <div id="status">Загрузка данных...</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const background = new Image();
+        background.src = 'https://github.com/oluneva/my_site/raw/main/my-image.jpg';
+
+        let circles = [];
+        let data = [];
+        let selectedFilters = { class: '', subclass: '', type: '', subtype: '', group: '' }; // Убрали subgroup из selectedFilters, так как он скрыт
+        let blinkingCircleIds = [];
+        let blinkInterval = null;
+        let isBlinking = false;
+        let csvLoaded = false;
+
+        // Функция загрузки кругов из circles_export.json
+        async function loadCircles() {
+            try {
+                console.log('Пытаюсь загрузить circles_export.json...');
+                const response = await fetch('https://raw.githubusercontent.com/oluneva/my_site/main/circles_export.json');
+                if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                circles = await response.json();
+                circles = circles.filter(circle => circle && typeof circle.id === 'string' && circle.id.trim() !== '' && typeof circle.x === 'number' && typeof circle.y === 'number');
+                if (circles.length === 0) throw new Error('JSON пустой или некорректный');
+                console.log('Круги загружены из circles_export.json:', circles.length, 'кругов');
+                document.getElementById('status').textContent = `Загружено ${circles.length} кругов.`;
+            } catch (e) {
+                console.warn('Не удалось загрузить circles_export.json, используем дефолтные круги:', e.message);
+                circles = [
+                    { id: 'Круг1', x: 100, y: 100 },
+                    { id: 'Круг2', x: 200, y: 200 },
+                    { id: 'Круг3', x: 300, y: 300 }
+                ];
+                document.getElementById('status').textContent = 'Используются демо-круги.';
+            }
+        }
+
+        // Загрузка и парсинг CSV с разделителем ";"
+        async function loadCSV() {
+            try {
+                console.log('Пытаюсь загрузить Plants.csv...');
+                const response = await fetch('https://raw.githubusercontent.com/oluneva/my_site/main/Plants.csv');
+                if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                const buffer = await response.arrayBuffer();
+                const decoder = new TextDecoder('windows-1251');  // Измените на 'utf-8', если символы искажены
+                const csvText = decoder.decode(buffer);
+                console.log('Сырой текст CSV (первые 500 символов):', csvText.substring(0, 500));
+
+                // Парсинг с разделителем ";"
+                const rows = csvText.split('\n').filter(row => row.trim() !== '');
+                if (rows.length < 2) throw new Error('CSV содержит менее 2 строк (заголовки + данные)');
+                const headers = rows[0].split(';').map(h => h.replace(/^"|"$/g, '').trim());
+                console.log('Заголовки:', headers);
+                if (headers.length !== 6 || !headers.includes('Класс') || !headers.includes('Круг')) {
+                    throw new Error('Заголовки CSV не соответствуют ожидаемым: ["Класс", "Семейство", "Род", "Вид", "Сорт", "Круг"]');
+                }
+
+                data = rows.slice(1).map(row => {
+                    const cells = row.split(';').map(cell => cell.replace(/^"|"$/g, '').trim());
+                    if (cells.length !== 6) return null;
+                    return {
+                        class: cells[0],     // Класс
+                        subclass: cells[1],  // Семейство
+                        type: cells[2],      // Род
+                        subtype: cells[3],   // Вид
+                        group: cells[4],     // Сорт
+                        subgroup: cells[5]   // Круг
+                    };
+                }).filter(item => item && item.class && item.subgroup);
+                console.log('Данные загружены из CSV:', data.length, 'записей');
+                csvLoaded = true;
+                document.getElementById('status').textContent += ' Данные фильтров загружены.';
+            } catch (e) {
+                console.warn('Ошибка загрузки/парсинга CSV, используем демо-данные для фильтров:', e.message);
+                data = [
+                    { class: 'Класс1', subclass: 'Семейство1', type: 'Род1', subtype: 'Вид1', group: 'Сорт1', subgroup: 'Круг1' },
+                    { class: 'Класс1', subclass: 'Семейство1', type: 'Род1', subtype: 'Вид1', group: 'Сорт1', subgroup: 'Круг2' },  // Для теста нескольких кругов
+                    { class: 'Класс2', subclass: 'Семейство2', type: 'Род2', subtype: 'Вид2', group: 'Сорт2', subgroup: 'Круг3' }
+                ];
+                document.getElementById('status').textContent += ' Используются демо-данные для фильтров.';
+            }
+        }
+
+        // Заполнение фильтров
+        function populateFilters() {
+            const classSelect = document.getElementById('classSelect');
+            const subclassSelect = document.getElementById('subclassSelect');
+            const typeSelect = document.getElementById('typeSelect');
+            const subtypeSelect = document.getElementById('subtypeSelect');
+            const groupSelect = document.getElementById('groupSelect');
+
+            // Функция для обновления всех фильтров на основе текущих selectedFilters
+            function updateAllFilters() {
+                // Фильтруем данные на основе выбранных фильтров (только если выбрано что-то кроме пустой строки)
+                const filteredData = data.filter(d => {
+                    return (!selectedFilters.class || d.class === selectedFilters.class) &&
+                           (!selectedFilters.subclass || d.subclass === selectedFilters.subclass) &&
+                           (!selectedFilters.type || d.type === selectedFilters.type) &&
+                           (!selectedFilters.subtype || d.subtype === selectedFilters.subtype) &&
+                           (!selectedFilters.group || d.group === selectedFilters.group);
+                });
+
+                // Обновляем каждый селект
+                const classes = [...new Set(filteredData.map(d => d.class))].sort();
+                classSelect.innerHTML = '<option value="">Не выбрано</option>' + classes.map(c => `<option value="${c}">${c}</option>`).join('');
+                classSelect.value = selectedFilters.class;
+
+                const subclasses = [...new Set(filteredData.map(d => d.subclass))].sort();
+                subclassSelect.innerHTML = '<option value="">Не выбрано</option>' + subclasses.map(c => `<option value="${c}">${c}</option>`).join('');
+                subclassSelect.value = selectedFilters.subclass;
+
+                const types = [...new Set(filteredData.map(d => d.type))].sort();
+                typeSelect.innerHTML = '<option value="">Не выбрано</option>' + types.map(c => `<option value="${c}">${c}</option>`).join('');
+                typeSelect.value = selectedFilters.type;
+
+                const subtypes = [...new Set(filteredData.map(d => d.subtype))].sort();
+                subtypeSelect.innerHTML = '<option value="">Не выбрано</option>' + subtypes.map(c => `<option value="${c}">${c}</option>`).join('');
+                subtypeSelect.value = selectedFilters.subtype;
+
+                const groups = [...new Set(filteredData.map(d => d.group))].sort();
+                groupSelect.innerHTML = '<option value="">Не выбрано</option>' + groups.map(c => `<option value="${c}">${c}</option>`).join('');
+                groupSelect.value = selectedFilters.group;
+            }
+
+            // Изначально все фильтры на "Не выбрано", показываем все
+            updateAllFilters();
+
+            // Обработчики изменений для каждого селекта
+            classSelect.addEventListener('change', () => {
+                selectedFilters.class = classSelect.value;
+                updateAllFilters();
+            });
+
+            subclassSelect.addEventListener('change', () => {
+                selectedFilters.subclass = subclassSelect.value;
+                updateAllFilters();
+            });
+
+            typeSelect.addEventListener('change', () => {
+                selectedFilters.type = typeSelect.value;
+                updateAllFilters();
+            });
+
+            subtypeSelect.addEventListener('change', () => {
+                selectedFilters.subtype = subtypeSelect.value;
+                updateAllFilters();
+            });
+
+            groupSelect.addEventListener('change', () => {
+                selectedFilters.group = groupSelect.value;
+                updateAllFilters();
+            });
+        }
+
+        // Рендеринг кругов (всегда отображаются)
+        function drawCircles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (background.complete) {
+                ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+            }
+            circles.forEach(circle => {
+                ctx.beginPath();
+                ctx.arc(circle.x, circle.y, 7, 0, 2 * Math.PI);  // Радиус уменьшен в ~3 раза (20 / 3 ≈ 6.67, округлено до 7)
+                if (isBlinking && blinkingCircleIds.includes(circle.id)) {
+                    ctx.fillStyle = 'red';
+                } else {
+                    ctx.fillStyle = 'rgba(0, 128, 0, 0.5)';
+                }
+                ctx.fill();
+                ctx.strokeStyle = 'black';
+                ctx.stroke();
+                // Названия кругов убраны
+            });
+        }
+
+        // Мигание кругов
+        function blinkCircles(ids) {
+            if (isBlinking) {
+                clearInterval(blinkInterval);
+                isBlinking = false;
+            }
+            blinkingCircleIds = ids;
+            if (blinkingCircleIds.length === 0) {
+                document.getElementById('status').textContent = 'Не найдено кругов для выбранных фильтров.';
+                return;
+            }
+            isBlinking = true;
+            let blinkCount = 0;
+            blinkInterval = setInterval(() => {
+                drawCircles();
+                blinkCount++;
+                if (blinkCount >= 6) {  // 3 секунды (6 раз по 500мс)
+                    clearInterval(blinkInterval);
+                    isBlinking = false;
+                    blinkingCircleIds = [];
+                    drawCircles();
+                }
+            }, 500);
+        }
+
+        // Инициализация
+        async function init() {
+            await Promise.all([loadCircles(), loadCSV()]);
+            populateFilters();
+            drawCircles();
+            background.onload = drawCircles;
+        }
+
+        init();
+
+        // Кнопка "Найти растение"
+        document.getElementById('findPlantBtn').addEventListener('click', () => {
+            // Фильтруем данные по выбранным фильтрам
+            const filteredData = data.filter(d => {
+                return (!selectedFilters.class || d.class === selectedFilters.class) &&
+                       (!selectedFilters.subclass || d.subclass === selectedFilters.subclass) &&
+                       (!selectedFilters.type || d.type === selectedFilters.type) &&
+                       (!selectedFilters.subtype || d.subtype === selectedFilters.subtype) &&
+                       (!selectedFilters.group || d.group === selectedFilters.group);
+            });
+            // Собираем уникальные subgroup (Круги) из отфильтрованных данных
+            const uniqueSubgroups = [...new Set(filteredData.map(d => d.subgroup))];
+            blinkCircles(uniqueSubgroups);
+        });
+
+        // Кнопка перехода в режим разработчика - перенаправление на developer.html из репозитария
+        document.getElementById('switchToDeveloperBtn').addEventListener('click', () => {
+            // Предполагаем, что репозитарий опубликован как GitHub Pages по адресу https://oluneva.github.io/my_site/
+            window.location.href = 'https://oluneva.github.io/my_site/developer.html';
+        });
+    </script>
+</body>
+</html>
+
+повтори код
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Пользовательский режим - Просмотр кругов</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f0f0f0; }
+        #container { display: flex; flex-direction: column; align-items: center; }
+        #filters { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+        select { padding: 5px; }
+        #subgroupSelect { display: none; } /* Скрываем селектор Круга */
+        #controls { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+        button { padding: 10px; }
+        #canvas { border: 1px solid #000; }
+        #status { margin-top: 10px; font-size: 14px; color: #555; }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <h1 id="modeTitle">Пользовательский режим</h1>
+        <div id="filters">
+            <select id="classSelect"><option>Не выбрано</option></select>
+            <select id="subclassSelect"><option>Не выбрано</option></select>
+            <select id="typeSelect"><option>Не выбрано</option></select>
+            <select id="subtypeSelect"><option>Не выбрано</option></select>
+            <select id="groupSelect"><option>Не выбрано</option></select>
+            <select id="subgroupSelect"><option>Не выбрано</option></select> <!-- Скрыт -->
+        </div>
+        <div id="controls">
+            <button id="findPlantBtn">Найти растение</button>
+            <button id="switchToDeveloperBtn">Перейти в режим разработчика</button>
+        </div>
+        <canvas id="canvas" width="800" height="600"></canvas>
+        <div id="status">Загрузка данных...</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const background = new Image();
+        background.src = 'https://github.com/oluneva/my_site/raw/main/my-image.jpg';
+
+        let circles = [];
+        let data = [];
+        let selectedFilters = { class: '', subclass: '', type: '', subtype: '', group: '' }; // Убрали subgroup из selectedFilters, так как он скрыт
+        let blinkingCircleIds = [];
+        let blinkInterval = null;
+        let isBlinking = false;
+        let csvLoaded = false;
+
+        // Функция загрузки кругов из circles_export.json
+        async function loadCircles() {
+            try {
+                console.log('Пытаюсь загрузить circles_export.json...');
+                const response = await fetch('https://raw.githubusercontent.com/oluneva/my_site/main/circles_export.json');
+                if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                circles = await response.json();
+                circles = circles.filter(circle => circle && typeof circle.id === 'string' && circle.id.trim() !== '' && typeof circle.x === 'number' && typeof circle.y === 'number');
+                if (circles.length === 0) throw new Error('JSON пустой или некорректный');
+                console.log('Круги загружены из circles_export.json:', circles.length, 'кругов');
+                document.getElementById('status').textContent = `Загружено ${circles.length} кругов.`;
+            } catch (e) {
+                console.warn('Не удалось загрузить circles_export.json, используем дефолтные круги:', e.message);
+                circles = [
+                    { id: 'Круг1', x: 100, y: 100 },
+                    { id: 'Круг2', x: 200, y: 200 },
+                    { id: 'Круг3', x: 300, y: 300 }
+                ];
+                document.getElementById('status').textContent = 'Используются демо-круги.';
+            }
+        }
+
+        // Загрузка и парсинг CSV с разделителем ";"
+        async function loadCSV() {
+            try {
+                console.log('Пытаюсь загрузить Plants.csv...');
+                const response = await fetch('https://raw.githubusercontent.com/oluneva/my_site/main/Plants.csv');
+                if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                const buffer = await response.arrayBuffer();
+                const decoder = new TextDecoder('windows-1251');  // Измените на 'utf-8', если символы искажены
+                const csvText = decoder.decode(buffer);
+                console.log('Сырой текст CSV (первые 500 символов):', csvText.substring(0, 500));
+
+                // Парсинг с разделителем ";"
+                const rows = csvText.split('\n').filter(row => row.trim() !== '');
+                if (rows.length < 2) throw new Error('CSV содержит менее 2 строк (заголовки + данные)');
+                const headers = rows[0].split(';').map(h => h.replace(/^"|"$/g, '').trim());
+                console.log('Заголовки:', headers);
+                if (headers.length !== 6 || !headers.includes('Класс') || !headers.includes('Круг')) {
+                    throw new Error('Заголовки CSV не соответствуют ожидаемым: ["Класс", "Семейство", "Род", "Вид", "Сорт", "Круг"]');
+                }
+
+                data = rows.slice(1).map(row => {
+                    const cells = row.split(';').map(cell => cell.replace(/^"|"$/g, '').trim());
+                    if (cells.length !== 6) return null;
+                    return {
+                        class: cells[0],     // Класс
+                        subclass: cells[1],  // Семейство
+                        type: cells[2],      // Род
+                        subtype: cells[3],   // Вид
+                        group: cells[4],     // Сорт
+                        subgroup: cells[5]   // Круг
+                    };
+                }).filter(item => item && item.class && item.subgroup);
+                console.log('Данные загружены из CSV:', data.length, 'записей');
+                csvLoaded = true;
+                document.getElementById('status').textContent += ' Данные фильтров загружены.';
+            } catch (e) {
+                console.warn('Ошибка загрузки/парсинга CSV, используем демо-данные для фильтров:', e.message);
+                data = [
+                    { class: 'Класс1', subclass: 'Семейство1', type: 'Род1', subtype: 'Вид1', group: 'Сорт1', subgroup: 'Круг1' },
+                    { class: 'Класс1', subclass: 'Семейство1', type: 'Род1', subtype: 'Вид1', group: 'Сорт1', subgroup: 'Круг2' },  // Для теста нескольких кругов
+                    { class: 'Класс2', subclass: 'Семейство2', type: 'Род2', subtype: 'Вид2', group: 'Сорт2', subgroup: 'Круг3' }
+                ];
+                document.getElementById('status').textContent += ' Используются демо-данные для фильтров.';
+            }
+        }
+
+        // Заполнение фильтров
+        function populateFilters() {
+            const classSelect = document.getElementById('classSelect');
+            const subclassSelect = document.getElementById('subclassSelect');
+            const typeSelect = document.getElementById('typeSelect');
+            const subtypeSelect = document.getElementById('subtypeSelect');
+            const groupSelect = document.getElementById('groupSelect');
+
+            // Функция для обновления всех фильтров на основе текущих selectedFilters
+            function updateAllFilters() {
+                // Фильтруем данные на основе выбранных фильтров (только если выбрано что-то кроме пустой строки)
+                const filteredData = data.filter(d => {
+                    return (!selectedFilters.class || d.class === selectedFilters.class) &&
+                           (!selectedFilters.subclass || d.subclass === selectedFilters.subclass) &&
+                           (!selectedFilters.type || d.type === selectedFilters.type) &&
+                           (!selectedFilters.subtype || d.subtype === selectedFilters.subtype) &&
+                           (!selectedFilters.group || d.group === selectedFilters.group);
+                });
+
+                // Обновляем каждый селект
+                const classes = [...new Set(filteredData.map(d => d.class))].sort();
+                classSelect.innerHTML = '<option value="">Не выбрано</option>' + classes.map(c => `<option value="${c}">${c}</option>`).join('');
+                classSelect.value = selectedFilters.class;
+
+                const subclasses = [...new Set(filteredData.map(d => d.subclass))].sort();
+                subclassSelect.innerHTML = '<option value="">Не выбрано</option>' + subclasses.map(c => `<option value="${c}">${c}</option>`).join('');
+                subclassSelect.value = selectedFilters.subclass;
+
+                const types = [...new Set(filteredData.map(d => d.type))].sort();
+                typeSelect.innerHTML = '<option value="">Не выбрано</option>' + types.map(c => `<option value="${c}">${c}</option>`).join('');
+                typeSelect.value = selectedFilters.type;
+
+                const subtypes = [...new Set(filteredData.map(d => d.subtype))].sort();
+                subtypeSelect.innerHTML = '<option value="">Не выбрано</option>' + subtypes.map(c => `<option value="${c}">${c}</option>`).join('');
+                subtypeSelect.value = selectedFilters.subtype;
+
+                const groups = [...new Set(filteredData.map(d => d.group))].sort();
+                groupSelect.innerHTML = '<option value="">Не выбрано</option>' + groups.map(c => `<option value="${c}">${c}</option>`).join('');
+                groupSelect.value = selectedFilters.group;
+            }
+
+            // Изначально все фильтры на "Не выбрано", показываем все
+            updateAllFilters();
+
+            // Обработчики изменений для каждого селекта
+            classSelect.addEventListener('change', () => {
+                selectedFilters.class = classSelect.value;
+                updateAllFilters();
+            });
+
+            subclassSelect.addEventListener('change', () => {
+                selectedFilters.subclass = subclassSelect.value;
+                updateAllFilters();
+            });
+
+            typeSelect.addEventListener('change', () => {
+                selectedFilters.type = typeSelect.value;
+                updateAllFilters();
+            });
+
+            subtypeSelect.addEventListener('change', () => {
+                selectedFilters.subtype = subtypeSelect.value;
+                updateAllFilters();
+            });
+
+            groupSelect.addEventListener('change', () => {
+                selectedFilters.group = groupSelect.value;
+                updateAllFilters();
+            });
+        }
+
+        // Рендеринг кругов (всегда отображаются)
+        function drawCircles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (background.complete) {
+                ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+            }
+            circles.forEach(circle => {
+                ctx.beginPath();
+                ctx.arc(circle.x, circle.y, 7, 0, 2 * Math.PI);  // Радиус уменьшен в ~3 раза (20 / 3 ≈ 6.67, округлено до 7)
+                if (isBlinking && blinkingCircleIds.includes(circle.id)) {
+                    ctx.fillStyle = 'red';
+                } else {
+                    ctx.fillStyle = 'rgba(0, 128, 0, 0.5)';
+                }
+                ctx.fill();
+                ctx.strokeStyle = 'black';
+                ctx.stroke();
+                // Названия кругов убраны
+            });
+        }
+
+        // Мигание кругов
+        function blinkCircles(ids) {
+            if (isBlinking) {
+                clearInterval(blinkInterval);
+                isBlinking = false;
+            }
+            blinkingCircleIds = ids;
+            if (blinkingCircleIds.length === 0) {
+                document.getElementById('status').textContent = 'Не найдено кругов для выбранных фильтров.';
+                return;
+            }
+            isBlinking = true;
+            let blinkCount = 0;
+            blinkInterval = setInterval(() => {
+                drawCircles();
+                blinkCount++;
+                if (blinkCount >= 6) {  // 3 секунды (6 раз по 500мс)
+                    clearInterval(blinkInterval);
+                    isBlinking = false;
+                    blinkingCircleIds = [];
+                    drawCircles();
+                }
+            }, 500);
+        }
+
+        // Инициализация
+        async function init() {
+            await Promise.all([loadCircles(), loadCSV()]);
+            populateFilters();
+            drawCircles();
+            background.onload = drawCircles;
+        }
+
+        init();
+
+        // Кнопка "Найти растение"
+        document.getElementById('findPlantBtn').addEventListener('click', () => {
+            // Фильтруем данные по выбранным фильтрам
+            const filteredData = data.filter(d => {
+                return (!selectedFilters.class || d.class === selectedFilters.class) &&
+                       (!selectedFilters.subclass || d.subclass === selectedFilters.subclass) &&
+                       (!selectedFilters.type || d.type === selectedFilters.type) &&
+                       (!selectedFilters.subtype || d.subtype === selectedFilters.subtype) &&
+                       (!selectedFilters.group || d.group === selectedFilters.group);
+            });
+            // Собираем уникальные subgroup (Круги) из отфильтрованных данных
+            const uniqueSubgroups = [...new Set(filteredData.map(d => d.subgroup))];
+            blinkCircles(uniqueSubgroups);
+        });
+
+        // Кнопка перехода в режим разработчика - перенаправление на developer.html из репозитария
+        document.getElementById('switchToDeveloperBtn').addEventListener('click', () => {
+            // Предполагаем, что репозитарий опубликован как GitHub Pages по адресу https://oluneva.github.io/my_site/
+            window.location.href = 'https://oluneva.github.io/my_site/developer.html';
+        });
+    </script>
+</body>
+</html>
+
+еще раз повтори, присылаешь не полностью законченный код
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -26,6 +1148,628 @@
             <select id="subgroupSelect"><option>Не выбрано</option></select> <!-- Видим в режиме разработчика -->
         </div>
         <div id="controls">
+            <button id="findPlantBtn">Найти растение</button>
+            <button id="switchToUserBtn">Перейти в пользовательский режим</button>
+        </div>
+        <canvas id="canvas" width="800" height="600"></canvas>
+        <div id="status">Загрузка данных...</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const background = new Image();
+        background.src = 'https://github.com/oluneva/my_site/raw/main/my-image.jpg';
+
+        let circles = [];
+        let data = [];
+        let selectedFilters = { class: '', subclass: '', type: '', subtype: '', group: '', subgroup: '' }; // subgroup включен
+        let blinkingCircleIds = [];
+        let blinkInterval = null;
+        let isBlinking = false;
+        let csvLoaded = false;
+
+        // Функция загрузки кругов из circles_export.json
+        async function loadCircles() {
+            try {
+                console.log('Пытаюсь загрузить circles_export.json...');
+                const response = await fetch('https://raw.githubusercontent.com/oluneva/my_site/main/circles_export.json');
+                if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                circles = await response.json();
+                circles = circles.filter(circle => circle && typeof circle.id === 'string' && circle.id.trim() !== '' && typeof circle.x === 'number' && typeof circle.y === 'number');
+                if (circles.length === 0) throw new Error('JSON пустой или некорректный');
+                console.log('Круги загружены из circles_export.json:', circles.length, 'кругов');
+                document.getElementById('status').textContent = `Загружено ${circles.length} кругов.`;
+            } catch (e) {
+                console.warn('Не удалось загрузить circles_export.json, используем дефолтные круги:', e.message);
+                circles = [
+                    { id: 'Круг1', x: 100, y: 100 },
+                    { id: 'Круг2', x: 200, y: 200 },
+                    { id: 'Круг3', x: 300, y: 300 }
+                ];
+                document.getElementById('status').textContent = 'Используются демо-круги.';
+            }
+        }
+
+        // Загрузка и парсинг CSV с разделителем ";"
+        async function loadCSV() {
+            try {
+                console.log('Пытаюсь загрузить Plants.csv...');
+                const response = await fetch('https://raw.githubusercontent.com/oluneva/my_site/main/Plants.csv');
+                if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                const buffer = await response.arrayBuffer();
+                const decoder = new TextDecoder('windows-1251');  // Измените на 'utf-8', если символы искажены
+                const csvText = decoder.decode(buffer);
+                console.log('Сырой текст CSV (первые 500 символов):', csvText.substring(0, 500));
+
+                // Парсинг с разделителем ";"
+                const rows = csvText.split('\n').filter(row => row.trim() !== '');
+                if (rows.length < 2) throw new Error('CSV содержит менее 2 строк (заголовки + данные)');
+                const headers = rows[0].split(';').map(h => h.replace(/^"|"$/g, '').trim());
+                console.log('Заголовки:', headers);
+                if (headers.length !== 6 || !headers.includes('Класс') || !headers.includes('Круг')) {
+                    throw new Error('Заголовки CSV не соответствуют ожидаемым: ["Класс", "Семейство", "Род", "Вид", "Сорт", "Круг"]');
+                }
+
+                data = rows.slice(1).map(row => {
+                    const cells = row.split(';').map(cell => cell.replace(/^"|"$/g, '').trim());
+                    if (cells.length !== 6) return null;
+                    return {
+                        class: cells[0],     // Класс
+                        subclass: cells[1],  // Семейство
+                        type: cells[2],      // Род
+                        subtype: cells[3],   // Вид
+                        group: cells[4],     // Сорт
+                        subgroup: cells[5]   // Круг
+                    };
+                }).filter(item => item && item.class && item.subgroup);
+                console.log('Данные загружены из CSV:', data.length, 'записей');
+                csvLoaded = true;
+                document.getElementById('status').textContent += ' Данные фильтров загружены.';
+            } catch (e) {
+                console.warn('Ошибка загрузки/парсинга CSV, используем демо-данные для фильтров:', e.message);
+                data = [
+                    { class: 'Класс1', subclass: 'Семейство1', type: 'Род1', subtype: 'Вид1', group: 'Сорт1', subgroup: 'Круг1' },
+                    { class: 'Класс1', subclass: 'Семейство1', type: 'Род1', subtype: 'Вид1', group: 'Сорт1', subgroup: 'Круг2' },  // Для теста нескольких кругов
+                    { class: 'Класс2', subclass: 'Семейство2', type: 'Род2', subtype: 'Вид2', group: 'Сорт2', subgroup: 'Круг3' }
+                ];
+                document.getElementById('status').textContent += ' Используются демо-данные для фильтров.';
+            }
+        }
+
+        // Заполнение фильтров
+        function populateFilters() {
+            const classSelect = document.getElementById('classSelect');
+            const subclassSelect = document.getElementById('subclassSelect');
+            const typeSelect = document.getElementById('typeSelect');
+            const subtypeSelect = document.getElementById('subtypeSelect');
+            const groupSelect = document.getElementById('groupSelect');
+            const subgroupSelect = document.getElementById('subgroupSelect');
+
+            // Функция для обновления всех фильтров на основе текущих selectedFilters
+            function updateAllFilters() {
+                // Фильтруем данные на основе выбранных фильтров (только если выбрано что-то кроме пустой строки)
+                const filteredData = data.filter(d => {
+                    return (!selectedFilters.class || d.class === selectedFilters.class) &&
+                           (!selectedFilters.subclass || d.subclass === selectedFilters.subclass) &&
+                           (!selectedFilters.type || d.type === selectedFilters.type) &&
+                           (!selectedFilters.subtype || d.subtype === selectedFilters.subtype) &&
+                           (!selectedFilters.group || d.group === selectedFilters.group) &&
+                           (!selectedFilters.subgroup || d.subgroup === selectedFilters.subgroup);
+                });
+
+                // Обновляем каждый селект
+                const classes = [...new Set(filteredData.map(d => d.class))].sort();
+                classSelect.innerHTML = '<option value="">Не выбрано</option>' + classes.map(c => `<option value="${c}">${c}</option>`).join('');
+                classSelect.value = selectedFilters.class;
+
+                const subclasses = [...new Set(filteredData.map(d => d.subclass))].sort();
+                subclassSelect.innerHTML = '<option value="">Не выбрано</option>' + subclasses.map(c => `<option value="${c}">${c}</option>`).join('');
+                subclassSelect.value = selectedFilters.subclass;
+
+                const types = [...new Set(filteredData.map(d => d.type))].sort();
+                typeSelect.innerHTML = '<option value="">Не выбрано</option>' + types.map(c => `<option value="${c}">${c}</option>`).join('');
+                typeSelect.value = selectedFilters.type;
+
+                const subtypes = [...new Set(filteredData.map(d => d.subtype))].sort();
+                subtypeSelect.innerHTML = '<option value="">Не выбрано</option>' + subtypes.map(c => `<option value="${c}">${c}</option>`).join('');
+                subtypeSelect.value = selectedFilters.subtype;
+
+                const groups = [...new Set(filteredData.map(d => d.group))].sort();
+                groupSelect.innerHTML = '<option value="">Не выбрано</option>' + groups.map(c => `<option value="${c}">${c}</option>`).join('');
+                groupSelect.value = selectedFilters.group;
+
+                const subgroups = [...new Set(filteredData.map(d => d.subgroup))].sort();
+                subgroupSelect.innerHTML = '<option value="">Не выбрано</option>' + subgroups.map(c => `<option value="${c}">${c}</option>`).join('');
+                subgroupSelect.value = selectedFilters.subgroup;
+            }
+
+            // Изначально все фильтры на "Не выбрано", показываем все
+            updateAllFilters();
+
+            // Обработчики изменений для каждого селекта
+            classSelect.addEventListener('change', () => {
+                selectedFilters.class = classSelect.value;
+                updateAllFilters();
+            });
+
+            subclassSelect.addEventListener('change', () => {
+                selectedFilters.subclass = subclassSelect.value;
+                updateAllFilters();
+            });
+
+            typeSelect.addEventListener('change', () => {
+                selectedFilters.type = typeSelect.value;
+                updateAllFilters();
+            });
+
+            subtypeSelect.addEventListener('change', () => {
+                selectedFilters.subtype = subtypeSelect.value;
+                updateAllFilters();
+            });
+
+            groupSelect.addEventListener('change', () => {
+                selectedFilters.group = groupSelect.value;
+                updateAllFilters();
+            });
+
+            subgroupSelect.addEventListener('change', () => {
+                selectedFilters.subgroup = subgroupSelect.value;
+                updateAllFilters();
+            });
+        }
+
+        // Рендеринг кругов (всегда отображаются)
+        function drawCircles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (background.complete) {
+                ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+            }
+            circles.forEach(circle => {
+                ctx.beginPath();
+                ctx.arc(circle.x, circle.y, 7, 0, 2 * Math.PI);  // Радиус уменьшен в ~3 раза (20 / 3 ≈ 6.67, округлено до 7)
+                if (isBlinking && blinkingCircleIds.includes(circle.id)) {
+                    ctx.fillStyle = 'red';
+                } else {
+                    ctx.fillStyle = 'rgba(0, 128, 0, 0.5)';
+                }
+                ctx.fill();
+                ctx.strokeStyle = 'black';
+                ctx.stroke();
+                // Названия кругов убраны
+            });
+        }
+
+        // Мигание кругов
+        function blinkCircles(ids) {
+            if (isBlinking) {
+                clearInterval(blinkInterval);
+                isBlinking = false;
+            }
+            blinkingCircleIds = ids;
+            if (blinkingCircleIds.length === 0) {
+                document.getElementById('status').textContent = 'Не найдено кругов для выбранных фильтров.';
+                return;
+            }
+            isBlinking = true;
+            let blinkCount = 0;
+            blinkInterval = setInterval(() => {
+                drawCircles();
+                blinkCount++;
+                if (blinkCount >= 6) {  // 3 секунды (6 раз по 500мс)
+                    clearInterval(blinkInterval);
+                    isBlinking = false;
+                    blinkingCircleIds = [];
+                    drawCircles();
+                }
+            }, 500);
+        }
+
+        // Инициализация
+        async function init() {
+            await Promise.all([loadCircles(), loadCSV()]);
+            populateFilters();
+            drawCircles();
+            background.onload = drawCircles;
+        }
+
+        init();
+
+        // Кнопка "Найти растение"
+        document.getElementById('findPlantBtn').addEventListener('click', () => {
+            // В режиме разработчика требует выбора subgroup
+            if (!selectedFilters.subgroup) {
+                alert('В режиме разработчика необходимо выбрать Круг.');
+                return;
+            }
+            // Фильтруем данные по выбранным фильтрам
+            const filteredData = data.filter(d => {
+                return (!selectedFilters.class || d.class === selectedFilters.class) &&
+                       (!selectedFilters.subclass || d.subclass === selectedFilters.subclass) &&
+                       (!selectedFilters.type || d.type === selectedFilters.type) &&
+                       (!selectedFilters.subtype || d.subtype === selectedFilters.subtype) &&
+                       (!selectedFilters.group || d.group === selectedFilters.group) &&
+                       (!selectedFilters.subgroup || d.subgroup === selectedFilters.subgroup);
+            });
+            // Собираем уникальные subgroup (Круги) из отфильтрованных данных
+            const uniqueSubgroups = [...new Set(filteredData.map(d => d.subgroup))];
+            blinkCircles(uniqueSubgroups);
+        });
+
+        // Кнопка перехода в пользовательский режим - перенаправление на index.html или user.html из репозитария
+        document.getElementById('switchToUserBtn').addEventListener('click', () => {
+            // Предполагаем, что пользовательский режим на index.html или user.html
+            window.location.href = 'https://oluneva.github.io/my_site/index.html'; // Или user.html, если файл называется иначе
+        });
+    </script>
+</body>
+</html>
+
+Отлично!
+
+Рад, что код подошёл! Если возникнут вопросы или нужны доработки, пиши. 😊
+
+Убери надпись "Пользовательский режим"
+Нет надписей над фильтром.
+Фильтры и кнопки сделай на 1 строке
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Режим разработчика - Просмотр кругов</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f0f0f0; }
+        #container { display: flex; flex-direction: column; align-items: center; }
+        #topControls { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+        .filter-group { display: flex; flex-direction: column; align-items: flex-start; }
+        label { font-weight: bold; margin-bottom: 2px; font-size: 12px; }
+        select { padding: 5px; min-width: 120px; }
+        button { padding: 10px; }
+        #canvas { border: 1px solid #000; }
+        #status { margin-top: 10px; font-size: 14px; color: #555; }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <h1 id="modeTitle">Режим разработчика</h1>
+        <div id="topControls">
+            <div class="filter-group">
+                <label for="classSelect">Класс:</label>
+                <select id="classSelect"><option>Не выбрано</option></select>
+            </div>
+            <div class="filter-group">
+                <label for="subclassSelect">Семейство:</label>
+                <select id="subclassSelect"><option>Не выбрано</option></select>
+            </div>
+            <div class="filter-group">
+                <label for="typeSelect">Род:</label>
+                <select id="typeSelect"><option>Не выбрано</option></select>
+            </div>
+            <div class="filter-group">
+                <label for="subtypeSelect">Вид:</label>
+                <select id="subtypeSelect"><option>Не выбрано</option></select>
+            </div>
+            <div class="filter-group">
+                <label for="groupSelect">Сорт:</label>
+                <select id="groupSelect"><option>Не выбрано</option></select>
+            </div>
+            <div class="filter-group">
+                <label for="subgroupSelect">Круг:</label>
+                <select id="subgroupSelect"><option>Не выбрано</option></select>
+            </div>
+            <button id="findPlantBtn">Найти растение</button>
+            <button id="switchToUserBtn">Перейти в пользовательский режим</button>
+        </div>
+        <canvas id="canvas" width="800" height="600"></canvas>
+        <div id="status">Загрузка данных...</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const background = new Image();
+        background.src = 'https://github.com/oluneva/my_site/raw/main/my-image.jpg';
+
+        let circles = [];
+        let data = [];
+        let selectedFilters = { class: '', subclass: '', type: '', subtype: '', group: '', subgroup: '' }; // subgroup включен
+        let blinkingCircleIds = [];
+        let blinkInterval = null;
+        let isBlinking = false;
+        let csvLoaded = false;
+
+        // Функция загрузки кругов из circles_export.json
+        async function loadCircles() {
+            try {
+                console.log('Пытаюсь загрузить circles_export.json...');
+                const response = await fetch('https://raw.githubusercontent.com/oluneva/my_site/main/circles_export.json');
+                if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                circles = await response.json();
+                circles = circles.filter(circle => circle && typeof circle.id === 'string' && circle.id.trim() !== '' && typeof circle.x === 'number' && typeof circle.y === 'number');
+                if (circles.length === 0) throw new Error('JSON пустой или некорректный');
+                console.log('Круги загружены из circles_export.json:', circles.length, 'кругов');
+                document.getElementById('status').textContent = `Загружено ${circles.length} кругов.`;
+            } catch (e) {
+                console.warn('Не удалось загрузить circles_export.json, используем дефолтные круги:', e.message);
+                circles = [
+                    { id: 'Круг1', x: 100, y: 100 },
+                    { id: 'Круг2', x: 200, y: 200 },
+                    { id: 'Круг3', x: 300, y: 300 }
+                ];
+                document.getElementById('status').textContent = 'Используются демо-круги.';
+            }
+        }
+
+        // Загрузка и парсинг CSV с разделителем ";"
+        async function loadCSV() {
+            try {
+                console.log('Пытаюсь загрузить Plants.csv...');
+                const response = await fetch('https://raw.githubusercontent.com/oluneva/my_site/main/Plants.csv');
+                if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                const buffer = await response.arrayBuffer();
+                const decoder = new TextDecoder('windows-1251');  // Измените на 'utf-8', если символы искажены
+                const csvText = decoder.decode(buffer);
+                console.log('Сырой текст CSV (первые 500 символов):', csvText.substring(0, 500));
+
+                // Парсинг с разделителем ";"
+                const rows = csvText.split('\n').filter(row => row.trim() !== '');
+                if (rows.length < 2) throw new Error('CSV содержит менее 2 строк (заголовки + данные)');
+                const headers = rows[0].split(';').map(h => h.replace(/^"|"$/g, '').trim());
+                console.log('Заголовки:', headers);
+                if (headers.length !== 6 || !headers.includes('Класс') || !headers.includes('Круг')) {
+                    throw new Error('Заголовки CSV не соответствуют ожидаемым: ["Класс", "Семейство", "Род", "Вид", "Сорт", "Круг"]');
+                }
+
+                data = rows.slice(1).map(row => {
+                    const cells = row.split(';').map(cell => cell.replace(/^"|"$/g, '').trim());
+                    if (cells.length !== 6) return null;
+                    return {
+                        class: cells[0],     // Класс
+                        subclass: cells[1],  // Семейство
+                        type: cells[2],      // Род
+                        subtype: cells[3],   // Вид
+                        group: cells[4],     // Сорт
+                        subgroup: cells[5]   // Круг
+                    };
+                }).filter(item => item && item.class && item.subgroup);
+                console.log('Данные загружены из CSV:', data.length, 'записей');
+                csvLoaded = true;
+                document.getElementById('status').textContent += ' Данные фильтров загружены.';
+            } catch (e) {
+                console.warn('Ошибка загрузки/парсинга CSV, используем демо-данные для фильтров:', e.message);
+                data = [
+                    { class: 'Класс1', subclass: 'Семейство1', type: 'Род1', subtype: 'Вид1', group: 'Сорт1', subgroup: 'Круг1' },
+                    { class: 'Класс1', subclass: 'Семейство1', type: 'Род1', subtype: 'Вид1', group: 'Сорт1', subgroup: 'Круг2' },  // Для теста нескольких кругов
+                    { class: 'Класс2', subclass: 'Семейство2', type: 'Род2', subtype: 'Вид2', group: 'Сорт2', subgroup: 'Круг3' }
+                ];
+                document.getElementById('status').textContent += ' Используются демо-данные для фильтров.';
+            }
+        }
+
+        // Заполнение фильтров
+        function populateFilters() {
+            const classSelect = document.getElementById('classSelect');
+            const subclassSelect = document.getElementById('subclassSelect');
+            const typeSelect = document.getElementById('typeSelect');
+            const subtypeSelect = document.getElementById('subtypeSelect');
+            const groupSelect = document.getElementById('groupSelect');
+            const subgroupSelect = document.getElementById('subgroupSelect');
+
+            // Функция для обновления всех фильтров на основе текущих selectedFilters
+            function updateAllFilters() {
+                // Фильтруем данные на основе выбранных фильтров (только если выбрано что-то кроме пустой строки)
+                const filteredData = data.filter(d => {
+                    return (!selectedFilters.class || d.class === selectedFilters.class) &&
+                           (!selectedFilters.subclass || d.subclass === selectedFilters.subclass) &&
+                           (!selectedFilters.type || d.type === selectedFilters.type) &&
+                           (!selectedFilters.subtype || d.subtype === selectedFilters.subtype) &&
+                           (!selectedFilters.group || d.group === selectedFilters.group) &&
+                           (!selectedFilters.subgroup || d.subgroup === selectedFilters.subgroup);
+                });
+
+                // Обновляем каждый селект
+                const classes = [...new Set(filteredData.map(d => d.class))].sort();
+                classSelect.innerHTML = '<option value="">Не выбрано</option>' + classes.map(c => `<option value="${c}">${c}</option>`).join('');
+                classSelect.value = selectedFilters.class;
+
+                const subclasses = [...new Set(filteredData.map(d => d.subclass))].sort();
+                subclassSelect.innerHTML = '<option value="">Не выбрано</option>' + subclasses.map(c => `<option value="${c}">${c}</option>`).join('');
+                subclassSelect.value = selectedFilters.subclass;
+
+                const types = [...new Set(filteredData.map(d => d.type))].sort();
+                typeSelect.innerHTML = '<option value="">Не выбрано</option>' + types.map(c => `<option value="${c}">${c}</option>`).join('');
+                typeSelect.value = selectedFilters.type;
+
+                const subtypes = [...new Set(filteredData.map(d => d.subtype))].sort();
+                subtypeSelect.innerHTML = '<option value="">Не выбрано</option>' + subtypes.map(c => `<option value="${c}">${c}</option>`).join('');
+                subtypeSelect.value = selectedFilters.subtype;
+
+                const groups = [...new Set(filteredData.map(d => d.group))].sort();
+                groupSelect.innerHTML = '<option value="">Не выбрано</option>' + groups.map(c => `<option value="${c}">${c}</option>`).join('');
+                groupSelect.value = selectedFilters.group;
+
+                const subgroups = [...new Set(filteredData.map(d => d.subgroup))].sort();
+                subgroupSelect.innerHTML = '<option value="">Не выбрано</option>' + subgroups.map(c => `<option value="${c}">${c}</option>`).join('');
+                subgroupSelect.value = selectedFilters.subgroup;
+            }
+
+            // Изначально все фильтры на "Не выбрано", показываем все
+            updateAllFilters();
+
+            // Обработчики изменений для каждого селекта
+            classSelect.addEventListener('change', () => {
+                selectedFilters.class = classSelect.value;
+                updateAllFilters();
+            });
+
+            subclassSelect.addEventListener('change', () => {
+                selectedFilters.subclass = subclassSelect.value;
+                updateAllFilters();
+            });
+
+            typeSelect.addEventListener('change', () => {
+                selectedFilters.type = typeSelect.value;
+                updateAllFilters();
+            });
+
+            subtypeSelect.addEventListener('change', () => {
+                selectedFilters.subtype = subtypeSelect.value;
+                updateAllFilters();
+            });
+
+            groupSelect.addEventListener('change', () => {
+                selectedFilters.group = groupSelect.value;
+                updateAllFilters();
+            });
+
+            subgroupSelect.addEventListener('change', () => {
+                selectedFilters.subgroup = subgroupSelect.value;
+                updateAllFilters();
+            });
+        }
+
+        // Рендеринг кругов (всегда отображаются)
+        function drawCircles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (background.complete) {
+                ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+            }
+            circles.forEach(circle => {
+                ctx.beginPath();
+                ctx.arc(circle.x, circle.y, 7, 0, 2 * Math.PI);  // Радиус уменьшен в ~3 раза (20 / 3 ≈ 6.67, округлено до 7)
+                if (isBlinking && blinkingCircleIds.includes(circle.id)) {
+                    ctx.fillStyle = 'red';
+                } else {
+                    ctx.fillStyle = 'rgba(0, 128, 0, 0.5)';
+                }
+                ctx.fill();
+                ctx.strokeStyle = 'black';
+                ctx.stroke();
+                // Названия кругов убраны
+            });
+        }
+
+        // Мигание кругов
+        function blinkCircles(ids) {
+            if (isBlinking) {
+                clearInterval(blinkInterval);
+                isBlinking = false;
+            }
+            blinkingCircleIds = ids;
+            if (blinkingCircleIds.length === 0) {
+                document.getElementById('status').textContent = 'Не найдено кругов для выбранных фильтров.';
+                return;
+            }
+            isBlinking = true;
+            let blinkCount = 0;
+            blinkInterval = setInterval(() => {
+                drawCircles();
+                blinkCount++;
+                if (blinkCount >= 6) {  // 3 секунды (6 раз по 500мс)
+                    clearInterval(blinkInterval);
+                    isBlinking = false;
+                    blinkingCircleIds = [];
+                    drawCircles();
+                }
+            }, 500);
+        }
+
+        // Инициализация
+        async function init() {
+            await Promise.all([loadCircles(), loadCSV()]);
+            populateFilters();
+            drawCircles();
+            background.onload = drawCircles;
+        }
+
+        init();
+
+        // Кнопка "Найти растение"
+        document.getElementById('findPlantBtn').addEventListener('click', () => {
+            // В режиме разработчика требует выбора subgroup
+            if (!selectedFilters.subgroup) {
+                alert('В режиме разработчика необходимо выбрать Круг.');
+                return;
+            }
+            // Фильтруем данные по выбранным фильтрам
+            const filteredData = data.filter(d => {
+                return (!selectedFilters.class || d.class === selectedFilters.class) &&
+                       (!selectedFilters.subclass || d.subclass === selectedFilters.subclass) &&
+                       (!selectedFilters.type || d.type === selectedFilters.type) &&
+                       (!selectedFilters.subtype || d.subtype === selectedFilters.subtype) &&
+                       (!selectedFilters.group || d.group === selectedFilters.group) &&
+                       (!selectedFilters.subgroup || d.subgroup === selectedFilters.subgroup);
+            });
+            // Собираем уникальные subgroup (Круги) из отфильтрованных данных
+            const uniqueSubgroups = [...new Set(filteredData.map(d => d.subgroup))];
+            blinkCircles(uniqueSubgroups);
+        });
+
+        // Кнопка перехода в пользовательский режим - перенаправление на index.html или user.html из репозитария
+        document.getElementById('switchToUserBtn').addEventListener('click', () => {
+            // Предполагаем, что пользовательский режим на index.html или user.html
+            window.location.href = 'https://oluneva.github.io/my_site/index.html'; // Или user.html, если файл называется иначе
+        });
+    </script>
+</body>
+</html>
+
+Пояснения к изменениям:
+Убрал надпись "Пользовательский режим": Я предположил, что это относится к тексту кнопки (возможно, опечатка или ссылка на предыдущий контекст). Если имелось в виду что-то другое (например, заголовок страницы), уточни. Текст кнопки оставил как есть, но если нужно изменить на "Перейти в основной режим" или убрать совсем — дай знать.
+
+Добавил надписи над фильтрами: Каждый селект теперь обёрнут в .filter-group с <label> (например, "Класс:", "Семейство:" и т.д.). Лейблы маленькие и жирные для компактности.
+
+Фильтры и кнопки на одной строке: Объединил всё в #topControls с display: flex; flex-wrap: wrap; align-items: center;. Фильтры идут вертикально в группах (лейбл над селектом), но общий ряд горизонтальный. Если экран узкий, элементы переносятся на новую строку автоматически.
+
+Если нужно доработать (например, горизонтальные лейблы или другие стили), скажи! 😊
+
+убрать название "Пользовательский режим" только в заголовке страницы
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Просмотр кругов</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f0f0f0; }
+        #container { display: flex; flex-direction: column; align-items: center; }
+        #topControls { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+        .filter-group { display: flex; flex-direction: column; align-items: flex-start; }
+        label { font-weight: bold; margin-bottom: 2px; font-size: 12px; }
+        select { padding: 5px; min-width: 120px; }
+        button { padding: 10px; }
+        #canvas { border: 1px solid #000; }
+        #status { margin-top: 10px; font-size: 14px; color: #555; }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <h1 id="modeTitle">Режим разработчика</h1>
+        <div id="topControls">
+            <div class="filter-group">
+                <label for="classSelect">Класс:</label>
+                <select id="classSelect"><option>Не выбрано</option></select>
+            </div>
+            <div class="filter-group">
+                <label for="subclassSelect">Семейство:</label>
+                <select id="subclassSelect"><option>Не выбрано</option></select>
+            </div>
+            <div class="filter-group">
+                <label for="typeSelect">Род:</label>
+                <select id="typeSelect"><option>Не выбрано</option></select>
+            </div>
+            <div class="filter-group">
+                <label for="subtypeSelect">Вид:</label>
+                <select id="subtypeSelect"><option>Не выбрано</option></select>
+            </div>
+            <div class="filter-group">
+                <label for="groupSelect">Сорт:</label>
+                <select id="groupSelect"><option>Не выбрано</option></select>
+            </div>
+            <div class="filter-group">
+                <label for="subgroupSelect">Круг:</label>
+                <select id="subgroupSelect"><option>Не выбрано</option></select>
+            </div>
             <button id="findPlantBtn">Найти растение</button>
             <button id="switchToUserBtn">Перейти в пользовательский режим</button>
         </div>

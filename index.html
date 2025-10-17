@@ -17,20 +17,15 @@
         }
         #leftPanel {
             flex: 1.5; /* Левая панель занимает 75% ширины */
-            background-image: url('https://github.com/oluneva/my_site/raw/main/my-image.jpg');
+            /* Убрал background-image, так как изображение теперь рисуется на канвасе */
             background-color: #77c98c; /* Бледно-зеленый подложка под изображением */
-            background-size: contain; /* Пропорциональное масштабирование без искажения, изображение помещается целиком, пустые места заполняются фоном */
-            background-repeat: no-repeat;
-            background-position: center;
             display: flex;
             justify-content: center;
             align-items: center;
             padding: 20px;
         }
         #canvas {
-            max-width: 100%;
-            max-height: 100%;
-            /* Убрал border, чтобы фон не прерывался рамкой */
+            /* Убрал max-width и max-height для фиксированного размера по изображению; если нужно responsive, верните и адаптируйте код */
             display: block;
         }
         #rightPanel {
@@ -140,111 +135,98 @@
             init();
         };
 
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-
-        let circles = [];
+        let canvas, ctx;  // Глобальные переменные, инициализируем в init()
+        let circlesData = [];  // Глобальная переменная для данных кругов
+        let img;  // Глобальная переменная для изображения
         let data = [];
         let selectedFilters = { class: '', subclass: '', type: '', subtype: '', group: '' }; // subgroup скрыт, не используется
         let blinkingCircleIds = [];
         let blinkInterval = null;
         let isBlinking = false;
+        let blinkState = false;  // Для переключения состояния мигания
         let csvLoaded = false;
 
-        // Функция для обновления размеров canvas (responsive)
-        function resizeCanvas() {
-            canvas.width = canvas.clientWidth;
-            canvas.height = canvas.clientHeight;
-            console.log('Canvas resized:', canvas.width, 'x', canvas.height); // Лог для отладки
-            drawCircles(); // Перерисовываем после изменения размера
-        }
-
-        // Обработчик изменения размера окна
-        window.addEventListener('resize', resizeCanvas);
-
         // Функция загрузки кругов из circles_export.json
-       async function loadCircles() {
-    try {
-        console.log('Пытаюсь загрузить circles_export.json...');
-        const response = await fetch('https://raw.githubusercontent.com/oluneva/my_site/main/circles_export.json');
-        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        
-        circlesData = await response.json();
-        console.log('Круги загружены из circles_export.json:', circlesData.length, 'кругов');
-        if (circlesData.length > 0) {
-            console.log('Примеры координат (x,y):', circlesData.slice(0, 3).map(c => `ID ${c.id}: (${c.x}, ${c.y})`));
+        async function loadCircles() {
+            try {
+                console.log('Пытаюсь загрузить circles_export.json...');
+                const response = await fetch('https://raw.githubusercontent.com/oluneva/my_site/main/circles_export.json');
+                if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                
+                circlesData = await response.json();  // Заполняем глобальную переменную
+                console.log('Круги загружены из circles_export.json:', circlesData.length, 'кругов');
+                if (circlesData.length > 0) {
+                    console.log('Примеры координат (x,y):', circlesData.slice(0, 3).map(c => `ID ${c.id}: (${c.x}, ${c.y})`));
+                }
+                
+                // Загрузка изображения и рисование кругов
+                await loadImageAndDrawCircles();
+            } catch (e) {
+                console.error('Ошибка загрузки кругов:', e.message);
+            }
         }
-        
-        // Загрузка изображения и рисование кругов
-        await loadImageAndDrawCircles();
-    } catch (e) {
-        console.error('Ошибка загрузки кругов:', e.message);
-    }
-}
 
-async function loadImageAndDrawCircles() {
-    const canvas = document.getElementById('plantCanvas');  // Предполагаю ID канваса
-    const ctx = canvas.getContext('2d');
-    const img = new Image();
-    
-    img.onload = () => {
-        console.log('Изображение загружено, рисую круги...');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx.drawImage(img, 0, 0);
-        
-        // Рисуем круги
-        drawCircles(ctx, circlesData);
-    };
-    
-    img.onerror = () => {
-        console.error('Ошибка загрузки изображения plant_image.jpg');
-    };
-    
-    img.src = 'images/plant_image.jpg';  // Проверьте путь!
-}
-
-function drawCircles() {
-    if (!img) return;  // Если изображение не загружено, не рисуем
-    ctx.drawImage(img, 0, 0);  // Перерисовываем изображение
-    console.log('Рисую', circlesData.length, 'кругов...');
-    circlesData.forEach(circle => {
-        ctx.beginPath();
-        ctx.arc(circle.x, circle.y, 10, 0, 2 * Math.PI);  // Радиус 10px
-        if (blinkingCircleIds.includes(circle.id) && isBlinking && blinkState) {
-            ctx.fillStyle = 'red';  // Мигающие круги красные
-        } else {
-            ctx.fillStyle = 'green';  // Обычные круги зелёные
+        async function loadImageAndDrawCircles() {
+            img = new Image();  // Создаем изображение и сохраняем глобально
+            
+            img.onload = () => {
+                console.log('Изображение загружено, рисую...');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+                
+                // Рисуем круги
+                drawCircles();
+            };
+            
+            img.onerror = () => {
+                console.error('Ошибка загрузки изображения my-image.jpg');
+            };
+            
+            img.src = 'https://raw.githubusercontent.com/oluneva/my_site/main/my-image.jpg';  // Правильный URL
         }
-        ctx.fill();
-    });
-    console.log('Круги нарисованы.');
-}
+
+        function drawCircles() {
+            if (!img) return;  // Если изображение не загружено, не рисуем
+            ctx.drawImage(img, 0, 0);  // Перерисовываем изображение
+            console.log('Рисую', circlesData.length, 'кругов...');
+            circlesData.forEach(circle => {
+                ctx.beginPath();
+                ctx.arc(circle.x, circle.y, 10, 0, 2 * Math.PI);  // Радиус 10px
+                if (blinkingCircleIds.includes(circle.id) && isBlinking && blinkState) {
+                    ctx.fillStyle = 'red';  // Мигающие круги красные
+                } else {
+                    ctx.fillStyle = 'green';  // Обычные круги зелёные
+                }
+                ctx.fill();
+            });
+            console.log('Круги нарисованы.');
+        }
 
         // Функция загрузки данных из CSV
         async function loadCSV() {
-    try {
-        console.log('Пытаюсь загрузить Plants.csv...');
-        const response = await fetch('https://raw.githubusercontent.com/oluneva/my_site/main/Plants.csv');
-        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        
-        // Декодируем как Windows-1251 (CP1251), чтобы корректно прочитать русские буквы
-        const buffer = await response.arrayBuffer();
-        const decoder = new TextDecoder('windows-1251');  // Для CP1251; если другая кодировка, замените (например, 'iso-8859-5')
-        const csvText = decoder.decode(buffer);
-        
-        data = parseCSV(csvText);
-        console.log('CSV загружено:', data.length, 'записей');
-        if (data.length > 0) {
-            console.log('Примеры данных:', data.slice(0, 3));
+            try {
+                console.log('Пытаюсь загрузить Plants.csv...');
+                const response = await fetch('https://raw.githubusercontent.com/oluneva/my_site/main/Plants.csv');
+                if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                
+                // Декодируем как Windows-1251 (CP1251), чтобы корректно прочитать русские буквы
+                const buffer = await response.arrayBuffer();
+                const decoder = new TextDecoder('windows-1251');  // Для CP1251; если другая кодировка, замените (например, 'iso-8859-5')
+                const csvText = decoder.decode(buffer);
+                
+                data = parseCSV(csvText);
+                console.log('CSV загружено:', data.length, 'записей');
+                if (data.length > 0) {
+                    console.log('Примеры данных:', data.slice(0, 3));
+                }
+                populateFilters();
+                csvLoaded = true;
+            } catch (e) {
+                console.error('Ошибка загрузки CSV:', e.message);
+                alert('Не удалось загрузить данные растений. Проверьте консоль браузера.');
+            }
         }
-        populateFilters();
-        csvLoaded = true;
-    } catch (e) {
-        console.error('Ошибка загрузки CSV:', e.message);
-        alert('Не удалось загрузить данные растений. Проверьте консоль браузера.');
-    }
-}
 
         // Функция парсинга CSV с разделителем ";"
         function parseCSV(csvText) {
@@ -330,7 +312,7 @@ function drawCircles() {
                        (!selectedFilters.group || d['сорт'] === selectedFilters.group);
             });
             console.log('Отфильтрованные данные:', filtered.length);
-            blinkingCircleIds = filtered.map(d => d['круг']).filter(id => id && circles.some(c => c.id === id));
+            blinkingCircleIds = filtered.map(d => d['круг']).filter(id => id && circlesData.some(c => c.id == id));  // Исправлено на circlesData
             console.log('Мигающие круги:', blinkingCircleIds);
             if (blinkingCircleIds.length > 0) {
                 startBlinking();
@@ -339,15 +321,20 @@ function drawCircles() {
             }
         }
 
-         // Функции мигания
+        // Функции мигания
         function startBlinking() {
             if (blinkInterval) clearInterval(blinkInterval);
             isBlinking = true;
-            blinkInterval = setInterval(drawCircles, 500); // Каждые 500мс
+            blinkState = false;  // Начинаем с обычного состояния
+            blinkInterval = setInterval(() => {
+                blinkState = !blinkState;
+                drawCircles();
+            }, 500); // Каждые 500мс
         }
 
         function stopBlinking() {
             isBlinking = false;
+            blinkState = false;  // Возвращаем к обычному
             if (blinkInterval) {
                 clearInterval(blinkInterval);
                 blinkInterval = null;
@@ -362,13 +349,21 @@ function drawCircles() {
 
         // Инициализация
         async function init() {
+            canvas = document.getElementById('canvas');  // Инициализируем здесь, после загрузки DOM
+            if (!canvas) {
+                console.error('Канвас не найден!');
+                alert('Ошибка: канвас не найден. Проверьте HTML.');
+                return;
+            }
+            ctx = canvas.getContext('2d');
+            if (!ctx) {
+                console.error('Не удалось получить контекст 2D для канваса!');
+                alert('Ошибка: не удалось инициализировать канвас.');
+                return;
+            }
             await loadCircles();
             await loadCSV();
-            resizeCanvas(); // Первоначальный resize
         }
     </script>
 </body>
 </html>
-
-
-

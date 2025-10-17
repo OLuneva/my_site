@@ -193,7 +193,7 @@
         async function loadCSV() {
             try {
                 console.log('Пытаюсь загрузить data.csv...');
-                const response = await fetch('https://raw.githubusercontent.com/oluneva/my_site/main/plants.csv');
+                const response = await fetch('https://raw.githubusercontent.com/oluneva/my_site/main/Plants.csv');
                 if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 const csvText = await response.text();
                 data = parseCSV(csvText);
@@ -344,3 +344,4 @@
     </script>
 </body>
 </html>
+

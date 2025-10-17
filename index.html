@@ -145,7 +145,7 @@
 
         let circles = [];
         let data = [];
-        let selectedFilters = { class: '', subclass: '', type: '', subtype: '', group: '' }; // Убрали subgroup из selectedFilters, так как он скрыт
+        let selectedFilters = { class: '', subclass: '', type: '', subtype: '', group: '' }; // subgroup скрыт, не используется
         let blinkingCircleIds = [];
         let blinkInterval = null;
         let isBlinking = false;
@@ -192,27 +192,37 @@
         // Функция загрузки данных из CSV
         async function loadCSV() {
             try {
-                console.log('Пытаюсь загрузить data.csv...');
+                console.log('Пытаюсь загрузить Plants.csv...');
                 const response = await fetch('https://raw.githubusercontent.com/oluneva/my_site/main/Plants.csv');
                 if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 const csvText = await response.text();
                 data = parseCSV(csvText);
                 console.log('CSV загружено:', data.length, 'записей');
+                if (data.length > 0) {
+                    console.log('Примеры данных:', data.slice(0, 3));
+                }
                 populateFilters();
                 csvLoaded = true;
             } catch (e) {
                 console.error('Ошибка загрузки CSV:', e.message);
+                alert('Не удалось загрузить данные растений. Проверьте консоль браузера.');
             }
         }
 
         // Функция парсинга CSV с разделителем ";"
         function parseCSV(csvText) {
-            const lines = csvText.trim().split('\n');
+            const lines = csvText.trim().split('\n').filter(line => line.trim() !== ''); // Убираем пустые строки
+            if (lines.length < 2) {
+                console.warn('CSV пустой или содержит только заголовки');
+                return [];
+            }
             const headers = lines[0].split(';').map(h => h.trim());
             console.log('Заголовки CSV:', headers); // Лог заголовков для проверки
             const expectedHeaders = ['Класс', 'Семейство', 'Род', 'Вид', 'Сорт', 'Круг'];
-            if (headers.length !== expectedHeaders.length || !headers.every((h, i) => h === expectedHeaders[i])) {
-                console.warn('Заголовки CSV не соответствуют ожидаемым:', expectedHeaders);
+            // Гибкая проверка: если заголовки не точные, но есть похожие, продолжаем
+            if (!headers.some(h => h.toLowerCase().includes('класс'))) {
+                console.warn('Заголовки CSV не содержат "Класс". Проверьте файл.');
+                return [];
             }
             return lines.slice(1).map(line => {
                 const values = line.split(';').map(v => v.trim());
@@ -222,7 +232,7 @@
                 }
                 const row = {};
                 headers.forEach((header, index) => {
-                    row[header.toLowerCase()] = values[index];
+                    row[header.toLowerCase()] = values[index]; // Ключи в нижнем регистре для удобства
                 });
                 return row;
             }).filter(row => row !== null);
@@ -230,12 +240,13 @@
 
         // Функция заполнения селекторов
         function populateFilters() {
+            if (data.length === 0) return;
             const classSelect = document.getElementById('classSelect');
             const subclassSelect = document.getElementById('subclassSelect');
             const typeSelect = document.getElementById('typeSelect');
             const subtypeSelect = document.getElementById('subtypeSelect');
             const groupSelect = document.getElementById('groupSelect');
-            // subgroupSelect скрыт в пользовательском режиме
+            // subgroupSelect скрыт
 
             const classes = [...new Set(data.map(d => d['класс']).filter(Boolean))];
             const subclasses = [...new Set(data.map(d => d['семейство']).filter(Boolean))];
@@ -270,7 +281,10 @@
 
         // Функция фильтрации данных и поиска кругов
         function filterData() {
-            if (!csvLoaded) return;
+            if (!csvLoaded || data.length === 0) {
+                console.warn('Данные ещё не загружены');
+                return;
+            }
             const filtered = data.filter(d => {
                 return (!selectedFilters.class || d['класс'] === selectedFilters.class) &&
                        (!selectedFilters.subclass || d['семейство'] === selectedFilters.subclass) &&
@@ -330,7 +344,7 @@
             drawCircles(); // Перерисовываем без мигания
         }
 
-        // Кнопка "Найти растение" - в пользовательском режиме просто фильтрует, без требования subgroup
+        // Кнопка "Найти растение" - фильтрует без subgroup
         document.getElementById('findPlantBtn').addEventListener('click', () => {
             filterData();
         });
@@ -344,4 +358,3 @@
     </script>
 </body>
 </html>
-

@@ -16,7 +16,7 @@
             height: 100vh;
         }
         #leftPanel {
-            flex: 1,5; /* Левая панель занимает 75% ширины */
+            flex: 1; /* Левая панель занимает ~80% ширины (теперь больше места для изображения) */
             /* Убрал background-image, так как изображение теперь рисуется на канвасе */
             background-color: #77c98c; /* Бледно-зеленый подложка под изображением */
             background-size: contain; /* Пропорциональное масштабирование без искажения, изображение помещается целиком, пустые места заполняются фоном */
@@ -28,12 +28,12 @@
             padding: 20px;
         }
         #canvas {
-            max-width: 100%;
+            max-width: 95%; /* Увеличено с 80% до 95% для пропорционального увеличения изображения в левой панели (теперь занимает больше ширины, но пропорции сохраняются; пустые места в панели допустимы) */
             height: auto;
             display: block;
         }
         #rightPanel {
-            flex: 0.25; /* ширина правой панели */
+            flex: 0.25; /* Уменьшена ширина правой панели вдвое с 0.5 до 0.25 (~20% ширины) для компактности */
             background-color: #77c98c; /* Бледно-зеленый, как общий фон */
             padding: 15px; /* Уменьшенный padding */
             display: flex;
@@ -64,7 +64,7 @@
             font-size: 12px; /* Уменьшенный шрифт */
             background-color: white; /* Белый фон для селекторов */
             color: black; /* Черный текст в селекторах */
-            width: 50%; /* Новая строка: селекторы на всю ширину панели */
+            width: 100%; /* Селекторы на всю ширину панели */
         }
         #subgroupItem {
             display: none; /* Скрываем селектор "Круг" в пользовательском режиме */
@@ -291,6 +291,7 @@
             classSelect.addEventListener('change', () => { selectedFilters.class = classSelect.value; filterData(); });
             subclassSelect.addEventListener('change', () => { selectedFilters.subclass = subclassSelect.value; filterData(); });
             typeSelect.addEventListener('change', () => { selectedFilters.type = typeSelect.value; filterData(); });
+            typeSelect.addEventListener('change', () => { selectedFilters.type = typeSelect.value; filterData(); });
             subtypeSelect.addEventListener('change', () => { selectedFilters.subtype = subtypeSelect.value; filterData(); });
             groupSelect.addEventListener('change', () => { selectedFilters.group = groupSelect.value; filterData(); });
         }
@@ -375,8 +376,3 @@
     </script>
 </body>
 </html>
-
-
-
-
-

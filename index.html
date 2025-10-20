@@ -145,6 +145,7 @@
         let blinkInterval = null;
         let isBlinking = false;
         let blinkState = false;  // Для переключения состояния мигания
+        let blinkCount = 0;  // Счетчик миганий (добавлено для ограничения на 7 раз)
         let csvLoaded = false;
 
         // Переменные для логических размеров Canvas (адаптивные), как в разработчике
@@ -452,20 +453,26 @@
             }
         }
 
-        // Функции мигания, без изменений
+        // Функции мигания, изменены: теперь мигание происходит ровно 7 раз
         function startBlinking() {
             if (blinkInterval) clearInterval(blinkInterval);
             isBlinking = true;
             blinkState = false;  // Начинаем с обычного состояния
+            blinkCount = 0;  // Сбрасываем счетчик
             blinkInterval = setInterval(() => {
                 blinkState = !blinkState;
+                blinkCount++;
                 drawCircles();
+                if (blinkCount >= 7) {  // После 7 миганий останавливаемся
+                    stopBlinking();
+                }
             }, 500); // Каждые 500мс
         }
 
         function stopBlinking() {
             isBlinking = false;
             blinkState = false;  // Возвращаем к обычному
+            blinkCount = 0;  // Сбрасываем счетчик
             if (blinkInterval) {
                 clearInterval(blinkInterval);
                 blinkInterval = null;

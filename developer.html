@@ -146,18 +146,31 @@
         }
 
         function cascadeFilters(changedKey) {
-            const keys = ['Сорт', 'Круг'];
-            const selects = ['groupSelect', 'subgroupSelect'];
-            const index = keys.indexOf(changedKey);
-            if (index === 0) { // Изменён "Сорт"
-                selectedFilters['Круг'] = ''; // Сбрасываем выбор "Круг"
-                filteredData = selectedFilters['Сорт'] ? data.filter(d => d['Сорт'] === selectedFilters['Сорт']) : data; // Фильтруем data по "Сорт"
-                updateFilters(); // Обновляем оба селекта на основе filteredData
-                renderCircles(); // Перерисовываем круги (без фильтра по "Круг")
-            } else if (index === 1) { // Изменён "Круг"
-                renderCircles(); // Фильтруем отображение кругов
+    const keys = ['Сорт', 'Круг'];
+    const selects = ['groupSelect', 'subgroupSelect'];
+    const index = keys.indexOf(changedKey);
+    if (index === 0) { // Изменён "Сорт"
+        selectedFilters['Круг'] = ''; // Сбрасываем выбор "Круг"
+        filteredData = selectedFilters['Сорт'] ? data.filter(d => d['Сорт'] === selectedFilters['Сорт']) : data; // Фильтруем data по "Сорт"
+        updateFilters(); // Обновляем оба селекта на основе filteredData
+        renderCircles(); // Перерисовываем круги (без фильтра по "Круг")
+    } else if (index === 1) { // Изменён "Круг"
+        if (selectedFilters['Круг']) {
+            // Найти соответствующий Сорт для выбранного Круга
+            const entry = data.find(d => d['Круг'] === selectedFilters['Круг']);
+            if (entry) {
+                selectedFilters['Сорт'] = entry['Сорт'];
+                filteredData = data.filter(d => d['Сорт'] === selectedFilters['Сорт']); // Фильтруем по этому сорту
             }
+        } else {
+            // Если Круг сброшен, сбрасываем Сорт и возвращаем полный data
+            selectedFilters['Сорт'] = '';
+            filteredData = data;
         }
+        updateFilters(); // Обновляем селекты (Сорт автоматически выберется)
+        renderCircles(); // Перерисовываем круги
+    }
+}
 
         function renderCircles() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -346,3 +359,4 @@
     </script>
 </body>
 </html>
+

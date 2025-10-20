@@ -48,7 +48,8 @@
 
     <script>
         // Инициализируем интерфейс сразу без пароля
-        const ctx = document.getElementById('canvas').getContext('2d');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
         const background = new Image();
         let hasBackground = false;
 
@@ -59,10 +60,41 @@
         let draggedCircle = null;
         let newCircles = new Set();
         let maxLoadedId = 0; // Максимальный ID из загруженных кругов
-        let newCircleOffsetX = 0; // Смещение для новых кругов вправо
+        let newCircleOffsetX = 0; // Смещение для новых кругов вправо (в процентах)
+
+        // НОВОЕ: Переменные для логических размеров Canvas (адаптивные)
+        let logicalWidth = 800;
+        let logicalHeight = 600;
 
         // НОВОЕ: Для подсветки и отображения названий сортов
         let hoveredCircle = null; // Текущий наведённый круг
+
+        // НОВОЕ: Функция для инициализации Canvas (адаптивные размеры, масштаб устройства)
+        function initCanvas() {
+            const container = document.getElementById('canvasContainer');
+            const ratio = window.devicePixelRatio || 1;
+
+            // Логические размеры на основе контейнера
+            logicalWidth = container.clientWidth || 800; // Fallback на 800
+            logicalHeight = container.clientHeight || 600; // Fallback на 600
+
+            // Физические размеры с учётом масштаба устройства
+            canvas.width = logicalWidth * ratio;
+            canvas.height = logicalHeight * ratio;
+            canvas.style.width = logicalWidth + 'px';
+            canvas.style.height = logicalHeight + 'px';
+
+            // Масштабируем контекст для корректного рисования
+            ctx.scale(ratio, ratio);
+
+            // Опциональное предупреждение о масштабе
+            if (ratio !== 1) {
+                alert('Рекомендуется установить масштаб браузера на 100% для лучшего отображения. (Ctrl+0 или View > Actual Size)');
+            }
+
+            // Перерисовываем круги после инициализации
+            renderCircles();
+        }
 
         async function loadCircles() {
             try {
@@ -70,7 +102,8 @@
                 if (!response.ok) throw new Error('Файл не найден');
                 const data = await response.json();
                 circles = data.map(c => ({
-                    ...c,
+                    x: (c.x || 0) / 800, // НОРМАЛИЗУЕМ: координаты в процентах (от 0 до 1)
+                    y: (c.y || 0) / 600,
                     id: String(c.id || '')
                 }));
                 // Находим максимальный численный ID из загруженных
@@ -146,45 +179,48 @@
         }
 
         function cascadeFilters(changedKey) {
-    const keys = ['Сорт', 'Круг'];
-    const selects = ['groupSelect', 'subgroupSelect'];
-    const index = keys.indexOf(changedKey);
-    if (index === 0) { // Изменён "Сорт"
-        selectedFilters['Круг'] = ''; // Сбрасываем выбор "Круг"
-        filteredData = selectedFilters['Сорт'] ? data.filter(d => d['Сорт'] === selectedFilters['Сорт']) : data; // Фильтруем data по "Сорт"
-        updateFilters(); // Обновляем оба селекта на основе filteredData
-        renderCircles(); // Перерисовываем круги (без фильтра по "Круг")
-    } else if (index === 1) { // Изменён "Круг"
-        if (selectedFilters['Круг']) {
-            // Найти соответствующий Сорт для выбранного Круга
-            const entry = data.find(d => d['Круг'] === selectedFilters['Круг']);
-            if (entry) {
-                selectedFilters['Сорт'] = entry['Сорт'];
-                filteredData = data.filter(d => d['Сорт'] === selectedFilters['Сорт']); // Фильтруем по этому сорту
+            const keys = ['Сорт', 'Круг'];
+            const selects = ['groupSelect', 'subgroupSelect'];
+            const index = keys.indexOf(changedKey);
+            if (index === 0) { // Изменён "Сорт"
+                selectedFilters['Круг'] = ''; // Сбрасываем выбор "Круг"
+                filteredData = selectedFilters['Сорт'] ? data.filter(d => d['Сорт'] === selectedFilters['Сорт']) : data; // Фильтруем data по "Сорт"
+                updateFilters(); // Обновляем оба селекта на основе filteredData
+                renderCircles(); // Перерисовываем круги (без фильтра по "Круг")
+            } else if (index === 1) { // Изменён "Круг"
+                if (selectedFilters['Круг']) {
+                    // Найти соответствующий Сорт для выбранного Круга
+                    const entry = data.find(d => d['Круг'] === selectedFilters['Круг']);
+                    if (entry) {
+                        selectedFilters['Сорт'] = entry['Сорт'];
+                        filteredData = data.filter(d => d['Сорт'] === selectedFilters['Сорт']); // Фильтруем по этому сорту
+                    }
+                } else {
+                    // Если Круг сброшен, сбрасываем Сорт и возвращаем полный data
+                    selectedFilters['Сорт'] = '';
+                    filteredData = data;
+                }
+                updateFilters(); // Обновляем селекты (Сорт автоматически выберется)
+                renderCircles(); // Перерисовываем круги
             }
-        } else {
-            // Если Круг сброшен, сбрасываем Сорт и возвращаем полный data
-            selectedFilters['Сорт'] = '';
-            filteredData = data;
         }
-        updateFilters(); // Обновляем селекты (Сорт автоматически выберется)
-        renderCircles(); // Перерисовываем круги
-    }
-}
 
         function renderCircles() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.clearRect(0, 0, logicalWidth, logicalHeight); // Очищаем в логических размерах
             if (hasBackground) {
-                ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+                ctx.drawImage(background, 0, 0, logicalWidth, logicalHeight);
             } else {
                 ctx.fillStyle = '#77c98c'; // Бледно-зелёный fallback фон
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillRect(0, 0, logicalWidth, logicalHeight);
             }
             circles.forEach(circle => {
                 const isVisible = !selectedFilters['Круг'] || circle.id === selectedFilters['Круг'];
                 if (isVisible) {
+                    // МАСШТАБИРУЕМ координаты: проценты -> пиксели
+                    const x = circle.x * logicalWidth;
+                    const y = circle.y * logicalHeight;
                     ctx.beginPath();
-                    ctx.arc(circle.x, circle.y, 15, 0, 2 * Math.PI);
+                    ctx.arc(x, y, 15, 0, 2 * Math.PI);
                     // Цвет: красный для новых (newCircles), оранжевый для загруженных
                     // НОВОЕ: Подсветка при наведении (синий цвет)
                     if (hoveredCircle && hoveredCircle.id === circle.id) {
@@ -201,7 +237,7 @@
                         if (csvEntry && csvEntry['Сорт']) {
                             ctx.fillStyle = 'black';
                             ctx.font = '12px Arial';
-                            ctx.fillText(csvEntry['Сорт'], circle.x + 20, circle.y - 10); // Текст рядом с кругом
+                            ctx.fillText(csvEntry['Сорт'], x + 20, y - 10); // Текст рядом с кругом
                         }
                     }
                 }
@@ -221,21 +257,25 @@
         };
         background.src = 'https://raw.githubusercontent.com/oluneva/my_site/main/my-image.jpg'; // URL фона
 
-        // Загрузка данных
-        loadCircles();
-        loadCSV();
+        // НОВОЕ: Инициализируем Canvas и загружаем данные
+        window.addEventListener('load', () => {
+            initCanvas();
+            loadCircles();
+            loadCSV();
+        });
+
+        // НОВОЕ: Обработка изменения размера окна
+        window.addEventListener('resize', initCanvas);
 
         // Обработчики событий
         document.getElementById('addCircleBtn').addEventListener('click', () => {
             // Генерируем новый ID: maxLoadedId + 1
             const newId = maxLoadedId + 1;
             maxLoadedId = newId; // Увеличиваем для следующего
-            // Позиция: центр + сдвиг вправо
-            const centerX = canvas.width / 2;
-            const centerY = canvas.height / 2;
-            const x = centerX + newCircleOffsetX;
-            const y = centerY;
-            newCircleOffsetX += 30; // Сдвиг на 30 пикселей вправо для следующего
+            // Позиция: центр + сдвиг вправо (в процентах)
+            const x = 0.5 + newCircleOffsetX; // Центр 0.5, сдвиг
+            const y = 0.5;
+            newCircleOffsetX += 30 / 800; // Сдвиг на 30 пикселей (в процентах от 800)
             circles.push({ x, y, id: String(newId) });
             newCircles.add(String(newId)); // Новый круг — красный
             renderCircles();
@@ -259,7 +299,13 @@
         });
 
         document.getElementById('exportBtn').addEventListener('click', () => {
-            const dataStr = JSON.stringify(circles, null, 2);
+            // ДЕНОРМАЛИЗУЕМ координаты для экспорта (обратно в пиксели)
+            const exportData = circles.map(c => ({
+                x: Math.round(c.x * 800),
+                y: Math.round(c.y * 600),
+                id: c.id
+            }));
+            const dataStr = JSON.stringify(exportData, null, 2);
             const blob = new Blob([dataStr], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -279,8 +325,10 @@
                 const reader = new FileReader();
                 reader.onload = (event) => {
                     try {
+                        // НОРМАЛИЗУЕМ при импорте
                         circles = JSON.parse(event.target.result).map(c => ({
-                            ...c,
+                            x: (c.x || 0) / 800,
+                            y: (c.y || 0) / 600,
                             id: String(c.id || '')
                         }));
                         // После импорта пересчитываем maxLoadedId
@@ -313,24 +361,27 @@
 
         canvas.addEventListener('mousedown', (e) => {
             const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            draggedCircle = circles.find(c => Math.sqrt((c.x - x) ** 2 + (c.y - y) ** 2) < 15);
+            // НОРМАЛИЗУЕМ координаты мыши
+            const x = (e.clientX - rect.left) / logicalWidth;
+            const y = (e.clientY - rect.top) / logicalHeight;
+            // Ищем круг в масштабированных координатах
+            draggedCircle = circles.find(c => Math.sqrt((c.x - x) ** 2 + (c.y - y) ** 2) < 15 / logicalWidth); // Радиус в процентах
         });
 
         canvas.addEventListener('mousemove', (e) => {
             if (draggedCircle) {
                 const rect = canvas.getBoundingClientRect();
-                draggedCircle.x = e.clientX - rect.left;
-                draggedCircle.y = e.clientY - rect.top;
+                // НОРМАЛИЗУЕМ и обновляем
+                draggedCircle.x = (e.clientX - rect.left) / logicalWidth;
+                draggedCircle.y = (e.clientY - rect.top) / logicalHeight;
                 renderCircles();
             } else {
                 // НОВОЕ: Обновляем hoveredCircle для подсветки
                 const rect = canvas.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
+                const x = (e.clientX - rect.left) / logicalWidth;
+                const y = (e.clientY - rect.top) / logicalHeight;
                 const prevHovered = hoveredCircle;
-                hoveredCircle = circles.find(c => Math.sqrt((c.x - x) ** 2 + (c.y - y) ** 2) < 15);
+                hoveredCircle = circles.find(c => Math.sqrt((c.x - x) ** 2 + (c.y - y) ** 2) < 15 / logicalWidth);
                 if (prevHovered !== hoveredCircle) {
                     renderCircles(); // Перерисовываем только если изменилось
                 }
@@ -344,9 +395,9 @@
         canvas.addEventListener('keydown', (e) => {
             if (e.key === 'Delete') {
                 const rect = canvas.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
-                const index = circles.findIndex(c => Math.sqrt((c.x - x) ** 2 + (c.y - y) ** 2) < 15);
+                const x = (e.clientX - rect.left) / logicalWidth;
+                const y = (e.clientY - rect.top) / logicalHeight;
+                const index = circles.findIndex(c => Math.sqrt((c.x - x) ** 2 + (c.y - y) ** 2) < 15 / logicalWidth);
                 if (index !== -1) {
                     newCircles.delete(circles[index].id);
                     circles.splice(index, 1);
@@ -359,4 +410,3 @@
     </script>
 </body>
 </html>
-

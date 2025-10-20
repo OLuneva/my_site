@@ -5,9 +5,8 @@
     <title>Режим разработчика - Управление кругами</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f0f0f0; }
-        #container { display: flex; flex-direction: column; align-items: center; }
-        #password { margin-bottom: 20px; display: flex; gap: 10px; align-items: center; }
-        #content { display: none; width: 100%; max-width: 1200px; display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
+        #container { display: none; flex-direction: column; align-items: center; }
+        #content { width: 100%; max-width: 1200px; display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
         #leftPanel { /* Пусто, чтобы канвас был слева */ }
         #rightPanel { display: flex; flex-direction: column; gap: 10px; }
         #canvasContainer { flex: 1; display: flex; justify-content: center; }
@@ -19,15 +18,8 @@
 </head>
 <body>
     <div id="container">
-        <div id="password">
-            <label for="passwordInput">Пароль:</label>
-            <input type="password" id="passwordInput">
-            <button id="enterBtn">Войти</button>
-        </div>
         <div id="content">
-            <div id="leftPanel">
-                <!-- Пусто -->
-            </div>
+            <div id="leftPanel"></div>
             <div id="canvasContainer">
                 <canvas id="canvas" width="800" height="600"></canvas>
             </div>
@@ -42,17 +34,28 @@
                     <button id="switchToUserBtn">Перейти в пользовательский режим</button>
                 </div>
                 <div id="filters">
-                    <select id="groupSelect"><option>Выберите Сорт</option></select>
-                    <select id="subgroupSelect"><option>Выберите Круг</option></select>
+                    <select id="groupSelect">
+                        <option>Выберите Сорт</option>
+                    </select>
+                    <select id="subgroupSelect">
+                        <option>Выберите Круг</option>
+                    </select>
                 </div>
                 <div id="status">Наведите курсор на круг и нажмите Delete для удаления. Перетаскивайте для перемещения.</div>
             </div>
         </div>
     </div>
-
     <script>
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
+        const password = prompt('Введите пароль:');
+        if (password !== 'developer') {
+            return; // Ничего не делаем, элементы остаются скрытыми
+        }
+
+        // Показываем контейнер
+        document.getElementById('container').style.display = 'flex';
+
+        // Теперь инициализируем логику (без изменений)
+        const ctx = document.getElementById('canvas').getContext('2d');
         const background = new Image();
 
         let circles = [];
@@ -86,12 +89,12 @@
                 const decoder = new TextDecoder('windows-1251');
                 const csvText = decoder.decode(buffer);
                 data = parseCSV(csvText);
-                console.log('Загруженные данные из CSV:', data); // Отладка: проверьте консоль
+                console.log('Загруженные данные из CSV:', data);
                 if (data.length === 0) throw new Error('CSV пустой или некорректный');
                 filteredData = data;
                 updateFilters();
             } catch (e) {
-                console.error('Ошибка загрузки CSV:', e); // Отладка
+                console.error('Ошибка загрузки CSV:', e);
                 data = [
                     { Сорт: 'Сорт1', Круг: 'Круг1' },
                     { Сорт: 'Сорт2', Круг: 'Круг2' }
@@ -105,9 +108,9 @@
             const lines = csvText.split('\n').filter(line => line.trim());
             if (lines.length < 1) return [];
             const headers = lines[0].split(',').map(h => h.trim());
-            console.log('Заголовки CSV:', headers); // Отладка: проверьте консоль
+            console.log('Заголовки CSV:', headers);
             return lines.slice(1).map(line => {
-                const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, '')); // Убираем кавычки
+                const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
                 let obj = {};
                 headers.forEach((h, i) => obj[h] = values[i] || '');
                 return obj;
@@ -121,7 +124,7 @@
                 const select = document.getElementById(id);
                 select.innerHTML = `<option>Выберите ${keys[i]}</option>`;
                 const unique = [...new Set(filteredData.map(d => d[keys[i]]))].filter(v => v);
-                console.log(`Уникальные для ${keys[i]}:`, unique); // Отладка: проверьте консоль
+                console.log(`Уникальные для ${keys[i]}:`, unique);
                 unique.forEach(val => {
                     const option = document.createElement('option');
                     option.value = val;
@@ -136,13 +139,11 @@
             const selects = ['groupSelect', 'subgroupSelect'];
             const index = keys.indexOf(changedKey);
             if (index === 0) {
-                // Если изменили Сорт, обновляем Круг
                 selectedFilters['Круг'] = '';
                 filteredData = selectedFilters['Сорт'] ? data.filter(d => d['Сорт'] === selectedFilters['Сорт']) : data;
                 updateFilters();
                 document.getElementById('subgroupSelect').value = '';
             } else if (index === 1) {
-                // Если изменили Круг, фильтруем круги
                 renderCircles();
             }
         }
@@ -169,6 +170,7 @@
             return { x: evt.clientX - rect.left, y: evt.clientY - rect.top };
         }
 
+        const canvas = document.getElementById('canvas');
         canvas.addEventListener('mousedown', (e) => {
             const pos = getMousePos(e);
             draggedCircle = circles.find(c => Math.sqrt((c.x - pos.x) ** 2 + (c.y - pos.y) ** 2) < 15);
@@ -209,7 +211,6 @@
 
         document.getElementById('saveChangesBtn').addEventListener('click', () => {
             console.log('Сохранение изменений...');
-            // Здесь можно добавить логику сохранения на сервер
         });
 
         document.getElementById('exportBtn').addEventListener('click', () => {
@@ -244,7 +245,7 @@
         });
 
         document.getElementById('switchToUserBtn').addEventListener('click', () => {
-            window.location.href = 'index.html'; // Открывает в той же вкладке
+            window.location.href = 'index.html';
         });
 
         document.getElementById('groupSelect').addEventListener('change', (e) => {
@@ -257,20 +258,12 @@
             cascadeFilters('Круг');
         });
 
-        document.getElementById('enterBtn').addEventListener('click', () => {
-            const password = document.getElementById('passwordInput').value;
-            if (password === 'developer') {
-                document.getElementById('content').style.display = 'flex';
-                document.getElementById('password').style.display = 'none';
-                background.src = 'https://github.com/oluneva/my_site/raw/main/my-image.jpg';
-                background.onload = () => {
-                    loadCircles();
-                    loadCSV();
-                };
-            } else {
-                alert('Неверный пароль');
-            }
-        });
+        // Загружаем фон и данные
+        background.src = 'https://github.com/oluneva/my_site/raw/main/my-image.jpg';
+        background.onload = () => {
+            loadCircles();
+            loadCSV();
+        };
     </script>
 </body>
 </html>

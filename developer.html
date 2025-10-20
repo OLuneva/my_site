@@ -220,7 +220,7 @@
                     const x = circle.x * logicalWidth;
                     const y = circle.y * logicalHeight;
                     ctx.beginPath();
-                    ctx.arc(x, y, 15, 0, 2 * Math.PI);
+                    ctx.arc(x, y, 6, 0, 2 * Math.PI);
                     // Цвет: красный для новых (newCircles), оранжевый для загруженных
                     // НОВОЕ: Подсветка при наведении (синий цвет)
                     if (hoveredCircle && hoveredCircle.id === circle.id) {
@@ -410,3 +410,4 @@
     </script>
 </body>
 </html>
+

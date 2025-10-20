@@ -321,31 +321,44 @@ canvas.addEventListener('mouseover', (e) => {
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+    const circle = getCircleAt(x, y);  // Обязательно объявить circle ЗДЕСЬ!
+    
+    // Код для отладки — добавь сюда (после объявления circle)
     console.log('Курсоры на canvas:', x, y);
-if (circle) {
-    console.log('Найден круг с ID:', circle.id);
-    console.log('Ищу в data:', data.find(d => d['Круг'] === circle.id));
-} else {
-    console.log('Круг не найден');
-}
-    const circle = getCircleAt(x, y);
-    const tooltip = document.getElementById('tooltip');
     if (circle) {
-        // Попробуй точное совпадение
-        let matchingData = data.find(d => d['Круг'] === circle.id);
-        // Если не найдено, попробуй числовое (если id — строка числа, а 'Круг' — число)
+        console.log('Найден круг с ID:', circle.id);
+        console.log('Ищу в data:', data.find(d => d['Круг'] === circle.id));
+    } else {
+        console.log('Круг не найден');
+    }
+    
+    // Остальной код (tooltip и т.д.)
+    const tooltip = document.getElementById('tooltip');
+    
+    if (circle) {
+        // Ищем совпадение в данных из CSV
+        let matchingData = data.find(d => d['Круг'] === circle.id);  // Точное совпадение
+        
+        // Если не найдено, пробуем числовое (если id — строка вроде "1", а 'Круг' — число)
         if (!matchingData) {
             matchingData = data.find(d => String(d['Круг']) === circle.id);
         }
-        // Или с префиксом "Круг" (если id — число, а 'Круг' — "Круг1")
+        
+        // Если всё ещё не найдено и id — число, пробуем с префиксом "Круг" (например, id="1" → "Круг1")
         if (!matchingData && !isNaN(circle.id)) {
             matchingData = data.find(d => d['Круг'] === `Круг${circle.id}`);
         }
+        
+        // Определяем текст для tooltip
         const sort = matchingData ? matchingData['Сорт'] : 'Неизвестно';
         tooltip.textContent = `Сорт: ${sort}`;
+        
+        // Показываем tooltip рядом с курсором
         tooltip.style.display = 'block';
-        tooltip.style.left = `${e.clientX + 10}px`;
-        tooltip.style.top = `${e.clientY + 10}px`;
+        tooltip.style.left = `${e.clientX + 10}px`;  // Смещение вправо
+        tooltip.style.top = `${e.clientY + 10}px`;   // Смещение вниз
+    } else {
+        // Если курсор не над кругом, ничего не делаем (tooltip скрыт по умолчанию)
     }
 });
         
@@ -372,5 +385,6 @@ if (circle) {
     </script>
 </body>
 </html>
+
 
 

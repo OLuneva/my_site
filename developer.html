@@ -317,26 +317,35 @@
             draggedCircle = null;
         });
 
-        canvas.addEventListener('mouseover', (e) => {
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            const circle = getCircleAt(x, y);
-            const tooltip = document.getElementById('tooltip');
-            if (circle) {
-                const matchingData = data.find(d => d['Круг'] === circle.id);
-                const sort = matchingData ? matchingData['Сорт'] : 'Неизвестно';
-                tooltip.textContent = `Сорт: ${sort}`;
-                tooltip.style.display = 'block';
-                tooltip.style.left = `${e.clientX + 10}px`;
-                tooltip.style.top = `${e.clientY + 10}px`;
-            }
-        });
-
+canvas.addEventListener('mouseover', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const circle = getCircleAt(x, y);
+    const tooltip = document.getElementById('tooltip');
+    if (circle) {
+        // Попробуй точное совпадение
+        let matchingData = data.find(d => d['Круг'] === circle.id);
+        // Если не найдено, попробуй числовое (если id — строка числа, а 'Круг' — число)
+        if (!matchingData) {
+            matchingData = data.find(d => String(d['Круг']) === circle.id);
+        }
+        // Или с префиксом "Круг" (если id — число, а 'Круг' — "Круг1")
+        if (!matchingData && !isNaN(circle.id)) {
+            matchingData = data.find(d => d['Круг'] === `Круг${circle.id}`);
+        }
+        const sort = matchingData ? matchingData['Сорт'] : 'Неизвестно';
+        tooltip.textContent = `Сорт: ${sort}`;
+        tooltip.style.display = 'block';
+        tooltip.style.left = `${e.clientX + 10}px`;
+        tooltip.style.top = `${e.clientY + 10}px`;
+    }
+});
+        
         canvas.addEventListener('mouseout', () => {
-            const tooltip = document.getElementById('tooltip');
-            tooltip.style.display = 'none';
-        });
+    const tooltip = document.getElementById('tooltip');
+    tooltip.style.display = 'none';
+});
 
         canvas.addEventListener('keydown', (e) => {
             if (e.key === 'Delete') {
@@ -356,3 +365,4 @@
     </script>
 </body>
 </html>
+

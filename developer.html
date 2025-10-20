@@ -54,12 +54,11 @@
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
         const background = new Image();
-        background.src = 'https://github.com/oluneva/my_site/raw/main/my-image.jpg';
 
         let circles = [];
         let data = [];
         let filteredData = [];
-        let selectedFilters = { 'Сорт': '', 'Подгруппа': '' };
+        let selectedFilters = { 'Сорт': '', 'Круг': '' };
         let draggedCircle = null;
         let newCircles = new Set();
 
@@ -94,8 +93,8 @@
             } catch (e) {
                 console.error('Ошибка загрузки CSV:', e); // Отладка
                 data = [
-                    { Сорт: 'Сорт1', Подгруппа: 'Подгруппа1' },
-                    { Сорт: 'Сорт2', Подгруппа: 'Подгруппа2' }
+                    { Сорт: 'Сорт1', Круг: 'Круг1' },
+                    { Сорт: 'Сорт2', Круг: 'Круг2' }
                 ];
                 filteredData = data;
                 updateFilters();
@@ -106,6 +105,7 @@
             const lines = csvText.split('\n').filter(line => line.trim());
             if (lines.length < 1) return [];
             const headers = lines[0].split(',').map(h => h.trim());
+            console.log('Заголовки CSV:', headers); // Отладка: проверьте консоль
             return lines.slice(1).map(line => {
                 const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, '')); // Убираем кавычки
                 let obj = {};
@@ -116,10 +116,10 @@
 
         function updateFilters() {
             const selects = ['groupSelect', 'subgroupSelect'];
-            const keys = ['Сорт', 'Подгруппа'];
+            const keys = ['Сорт', 'Круг'];
             selects.forEach((id, i) => {
                 const select = document.getElementById(id);
-                select.innerHTML = `<option>Выберите ${i === 0 ? 'Сорт' : 'Круг'}</option>`;
+                select.innerHTML = `<option>Выберите ${keys[i]}</option>`;
                 const unique = [...new Set(filteredData.map(d => d[keys[i]]))].filter(v => v);
                 console.log(`Уникальные для ${keys[i]}:`, unique); // Отладка: проверьте консоль
                 unique.forEach(val => {
@@ -132,17 +132,17 @@
         }
 
         function cascadeFilters(changedKey) {
-            const keys = ['Сорт', 'Подгруппа'];
+            const keys = ['Сорт', 'Круг'];
             const selects = ['groupSelect', 'subgroupSelect'];
             const index = keys.indexOf(changedKey);
             if (index === 0) {
-                // Если изменили Сорт, обновляем Подгруппа
-                selectedFilters['Подгруппа'] = '';
+                // Если изменили Сорт, обновляем Круг
+                selectedFilters['Круг'] = '';
                 filteredData = selectedFilters['Сорт'] ? data.filter(d => d['Сорт'] === selectedFilters['Сорт']) : data;
                 updateFilters();
                 document.getElementById('subgroupSelect').value = '';
             } else if (index === 1) {
-                // Если изменили Подгруппа, фильтруем круги
+                // Если изменили Круг, фильтруем круги
                 renderCircles();
             }
         }
@@ -151,7 +151,7 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
             circles.forEach(circle => {
-                const isFiltered = selectedFilters['Подгруппа'] && circle.id !== selectedFilters['Подгруппа'];
+                const isFiltered = selectedFilters['Круг'] && circle.id !== selectedFilters['Круг'];
                 if (!isFiltered) {
                     ctx.beginPath();
                     ctx.arc(circle.x, circle.y, 15, 0, Math.PI * 2);
@@ -253,8 +253,8 @@
         });
 
         document.getElementById('subgroupSelect').addEventListener('change', (e) => {
-            selectedFilters['Подгруппа'] = e.target.value;
-            cascadeFilters('Подгруппа');
+            selectedFilters['Круг'] = e.target.value;
+            cascadeFilters('Круг');
         });
 
         document.getElementById('enterBtn').addEventListener('click', () => {
@@ -262,14 +262,15 @@
             if (password === 'developer') {
                 document.getElementById('content').style.display = 'flex';
                 document.getElementById('password').style.display = 'none';
-                loadCircles();
-                loadCSV();
+                background.src = 'https://github.com/oluneva/my_site/raw/main/my-image.jpg';
+                background.onload = () => {
+                    loadCircles();
+                    loadCSV();
+                };
             } else {
                 alert('Неверный пароль');
             }
         });
-
-        background.onload = renderCircles;
     </script>
 </body>
 </html>

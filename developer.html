@@ -326,7 +326,7 @@ canvas.addEventListener('mouseover', (e) => {
     // Код для отладки — добавь сюда (после объявления circle)
     console.log('Курсоры на canvas:', x, y);
     if (circle) {
-        console.log('Найден круг с ID:', circle.id);
+        console.log('Найден круг с ID:', circle.id);  // Теперь будет "circle_1", "circle_2" и т.д.
         console.log('Ищу в data:', data.find(d => d['Круг'] === circle.id));
     } else {
         console.log('Круг не найден');
@@ -337,16 +337,14 @@ canvas.addEventListener('mouseover', (e) => {
     
     if (circle) {
         // Ищем совпадение в данных из CSV
-        let matchingData = data.find(d => d['Круг'] === circle.id);  // Точное совпадение
+        let matchingData = data.find(d => d['Круг'] === circle.id);  // Точное совпадение (например, "circle_1" === "circle_1")
         
-        // Если не найдено, пробуем числовое (если id — строка вроде "1", а 'Круг' — число)
+        // Если не найдено, пробуем числовое (если ID="circle_1", ищем d['Круг'] === 1)
         if (!matchingData) {
-            matchingData = data.find(d => String(d['Круг']) === circle.id);
-        }
-        
-        // Если всё ещё не найдено и id — число, пробуем с префиксом "Круг" (например, id="1" → "Круг1")
-        if (!matchingData && !isNaN(circle.id)) {
-            matchingData = data.find(d => d['Круг'] === `Круг${circle.id}`);
+            const numericId = parseInt(circle.id.replace('circle_', ''), 10);  // Из "circle_1" получаем 1
+            if (!isNaN(numericId)) {
+                matchingData = data.find(d => d['Круг'] === numericId);
+            }
         }
         
         // Определяем текст для tooltip
@@ -385,6 +383,7 @@ canvas.addEventListener('mouseover', (e) => {
     </script>
 </body>
 </html>
+
 
 
 

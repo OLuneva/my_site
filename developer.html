@@ -72,11 +72,10 @@
                     ...c,
                     id: String(c.id || '')
                 }));
-                // Находим максимальный численный ID из загруженных
-                maxLoadedId = Math.max(...circles.map(c => parseInt(c.id) || 0)) || 0;
-                console.log('Максимальный ID из загруженных:', maxLoadedId);
-                // Очищаем newCircles для загруженных (они теперь "сохранённые")
-                newCircles.clear();
+                // Предполагаю, что у тебя есть массив ids вроде ['circle_1', 'circle_2', ..., 'circle_13']
+const numericIds = ids.map(id => parseInt(id.replace('circle_', ''), 10)).filter(id => !isNaN(id));
+const maxId = numericIds.length > 0 ? Math.max(...numericIds) : 0;
+console.log('Максимальный ID из загруженных:', maxId);  // Теперь будет 13!
             } catch (e) {
                 console.error('Ошибка загрузки circles_export.json:', e);
                 circles = []; // Пустой массив, если файл не найден
@@ -170,8 +169,24 @@
         }
 
         function getCircleAt(x, y) {
-            return circles.find(c => Math.sqrt((c.x - x) ** 2 + (c.y - y) ** 2) < 15);
+    console.log('Поиск круга по координатам:', x, y);  // Добавь для отладки
+    
+    // Предполагаю, что у тебя есть глобальный массив circles = [{id: 'circle_1', x: ..., y: ..., radius: ...}, ...]
+    for (let circle of circles) {  // Замени 'circles' на имя твоего массива кругов
+        const dx = x - circle.x;  // centerX круга
+        const dy = y - circle.y;  // centerY круга
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        console.log(`Проверяю ${circle.id}: расстояние = ${distance.toFixed(2)}, радиус = ${circle.radius}`);  // Отладка для каждого круга
+        
+        if (distance <= circle.radius + 10) {  // +10px для "подушки" (увеличь, если нужно)
+            console.log(`Найден! ID: ${circle.id}, расстояние: ${distance.toFixed(2)}`);
+            return circle;
         }
+    }
+    console.log('Ни один круг не найден');
+    return null;
+}
 
         function renderCircles() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -383,6 +398,7 @@ canvas.addEventListener('mouseover', (e) => {
     </script>
 </body>
 </html>
+
 
 
 

@@ -47,15 +47,17 @@
     </div>
 
     <script>
-        // Prompt для пароля при загрузке
-        const password = prompt('Введите пароль:');
+        // Временно закомментирован prompt для тестирования (заменено на фиксированный пароль)
+        // const password = prompt('Введите пароль:');
+        const password = 'developer'; // Временно без prompt для проверки
+
         if (password !== 'developer') {
-            // Если пароль неправильный, оставляем пустую страницу
+            // Если пароль неправильный, оставляем пустую страницу (ничего не загружается)
             document.body.innerHTML = '';
             return;
         }
 
-        // Если пароль правильный, инициализируем интерфейс (остальной код без изменений)
+        // Если пароль правильный, инициализируем интерфейс (весь код загрузки теперь здесь)
         const ctx = document.getElementById('canvas').getContext('2d');
         const background = new Image();
 
@@ -108,10 +110,11 @@
         function parseCSV(csvText) {
             const lines = csvText.split('\n').filter(line => line.trim());
             if (lines.length < 1) return [];
-            const headers = lines[0].split(',').map(h => h.trim());
+            // Разделитель ';'
+            const headers = lines[0].split(';').map(h => h.trim());
             console.log('Заголовки CSV:', headers);
             return lines.slice(1).map(line => {
-                const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+                const values = line.split(';').map(v => v.trim().replace(/^"|"$/g, ''));
                 let obj = {};
                 headers.forEach((h, i) => obj[h] = values[i] || '');
                 return obj;
@@ -259,7 +262,7 @@
             cascadeFilters('Круг');
         });
 
-        // Загружаем фон и данные
+        // Загружаем фон и данные ТОЛЬКО после проверки пароля
         background.src = 'https://github.com/oluneva/my_site/raw/main/my-image.jpg';
         background.onload = () => {
             loadCircles();

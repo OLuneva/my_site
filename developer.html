@@ -6,32 +6,48 @@
     <style>
         body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f0f0f0; }
         #container { display: flex; flex-direction: column; align-items: center; }
-        #filters { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+        #password { margin-bottom: 20px; display: flex; gap: 10px; align-items: center; }
+        #content { display: none; width: 100%; max-width: 1200px; display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
+        #leftPanel { /* Пустой, если не нужно */ }
+        #rightPanel { display: flex; flex-direction: column; gap: 10px; }
+        #canvasContainer { flex: 1; display: flex; justify-content: center; }
         select { padding: 5px; }
-        #controls { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
         button { padding: 10px; }
         #canvas { border: 1px solid #000; cursor: crosshair; }
-        #status { margin-top: 10px; font-size: 14px; color: #555; }
+        #status { margin-top: 10px; font-size: 14px; color: #555; text-align: center; }
     </style>
 </head>
 <body>
     <div id="container">
-        <h1>Режим разработчика</h1>
-        <div id="filters">
-            <select id="groupSelect"><option>Выберите Сорт</option></select>
-            <select id="subgroupSelect"><option>Выберите Круг</option></select>
+        <div id="password">
+            <label for="passwordInput">Пароль:</label>
+            <input type="password" id="passwordInput">
+            <button id="enterBtn">Войти</button>
         </div>
-        <div id="controls">
-            <button id="addCircleBtn">Добавить круг</button>
-            <button id="removeCircleBtn">Удалить круг</button>
-            <button id="saveChangesBtn">Сохранить изменения</button>
-            <button id="exportBtn">Экспорт JSON</button>
-            <input type="file" id="importInput" accept=".json" style="display: none;">
-            <button id="importBtn">Импорт JSON</button>
-            <button id="switchToUserBtn">Перейти в пользовательский режим</button>
+        <div id="content">
+            <div id="leftPanel">
+                <!-- Пусто, чтобы канвас был слева -->
+            </div>
+            <div id="canvasContainer">
+                <canvas id="canvas" width="800" height="600"></canvas>
+            </div>
+            <div id="rightPanel">
+                <div id="controls">
+                    <button id="addCircleBtn">Добавить круг</button>
+                    <button id="removeCircleBtn">Удалить круг</button>
+                    <button id="saveChangesBtn">Сохранить изменения</button>
+                    <button id="exportBtn">Экспорт JSON</button>
+                    <input type="file" id="importInput" accept=".json" style="display: none;">
+                    <button id="importBtn">Импорт JSON</button>
+                    <button id="switchToUserBtn">Перейти в пользовательский режим</button>
+                </div>
+                <div id="filters">
+                    <select id="groupSelect"><option>Выберите Сорт</option></select>
+                    <select id="subgroupSelect"><option>Выберите Круг</option></select>
+                </div>
+                <div id="status">Наведите курсор на круг и нажмите Delete для удаления. Перетаскивайте для перемещения.</div>
+            </div>
         </div>
-        <canvas id="canvas" width="800" height="600"></canvas>
-        <div id="status">Наведите курсор на круг и нажмите Delete для удаления. Перетаскивайте для перемещения.</div>
     </div>
 
     <script>
@@ -242,10 +258,6 @@
             renderCircles();
         };
 
-        // Загружаем данные
-        loadCircles();
-        loadCSV();
-
         // Кнопка "Сохранить изменения" — напоминание экспортировать
         document.getElementById('saveChangesBtn').addEventListener('click', () => {
             // Можно добавить сообщение в консоль, если нужно: console.log('Изменения не сохранены автоматически. Нажмите "Экспорт JSON" для скачивания файла и загрузите его в репозиторий вручную.');
@@ -285,6 +297,20 @@
                     }
                 };
                 reader.readAsText(file);
+            }
+        });
+
+        // Пароль для доступа (для режима разработчика - "developer")
+        document.getElementById('enterBtn').addEventListener('click', () => {
+            const password = document.getElementById('passwordInput').value;
+            if (password === 'developer') {
+                document.getElementById('password').style.display = 'none';
+                document.getElementById('content').style.display = 'flex';
+                // Загружаем данные после входа
+                loadCircles();
+                loadCSV();
+            } else {
+                alert('Неверный пароль');
             }
         });
     </script>

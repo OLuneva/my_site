@@ -238,7 +238,7 @@
                 const x = circle.x * logicalWidth;
                 const y = circle.y * logicalHeight;
                 ctx.beginPath();
-                ctx.arc(x, y, 15, 0, 2 * Math.PI);  // Радиус 15px, как в разработчике
+                ctx.arc(x, y, 6, 0, 2 * Math.PI);  // Радиус 15px, как в разработчике
                 if (blinkingCircleIds.includes(circle.id) && isBlinking && blinkState) {
                     ctx.fillStyle = 'red';  // Мигающие круги красные, как в разработчике для новых
                 } else {
@@ -429,3 +429,4 @@
     </script>
 </body>
 </html>
+

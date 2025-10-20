@@ -61,6 +61,9 @@
         let maxLoadedId = 0; // Максимальный ID из загруженных кругов
         let newCircleOffsetX = 0; // Смещение для новых кругов вправо
 
+        // НОВОЕ: Для подсветки и отображения названий сортов
+        let hoveredCircle = null; // Текущий наведённый круг
+
         async function loadCircles() {
             try {
                 const response = await fetch('https://raw.githubusercontent.com/oluneva/my_site/main/circles_export.json');
@@ -170,9 +173,24 @@
                     ctx.beginPath();
                     ctx.arc(circle.x, circle.y, 15, 0, 2 * Math.PI);
                     // Цвет: красный для новых (newCircles), оранжевый для загруженных
-                    ctx.fillStyle = newCircles.has(circle.id) ? 'red' : 'orange';
+                    // НОВОЕ: Подсветка при наведении (синий цвет)
+                    if (hoveredCircle && hoveredCircle.id === circle.id) {
+                        ctx.fillStyle = 'blue'; // Подсветка
+                    } else {
+                        ctx.fillStyle = newCircles.has(circle.id) ? 'red' : 'orange';
+                    }
                     ctx.fill();
                     ctx.stroke();
+                    
+                    // НОВОЕ: Отображение названия сорта при наведении
+                    if (hoveredCircle && hoveredCircle.id === circle.id) {
+                        const csvEntry = data.find(d => d['Круг'] === circle.id);
+                        if (csvEntry && csvEntry['Сорт']) {
+                            ctx.fillStyle = 'black';
+                            ctx.font = '12px Arial';
+                            ctx.fillText(csvEntry['Сорт'], circle.x + 20, circle.y - 10); // Текст рядом с кругом
+                        }
+                    }
                 }
             });
         }
@@ -293,6 +311,16 @@
                 draggedCircle.x = e.clientX - rect.left;
                 draggedCircle.y = e.clientY - rect.top;
                 renderCircles();
+            } else {
+                // НОВОЕ: Обновляем hoveredCircle для подсветки
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const prevHovered = hoveredCircle;
+                hoveredCircle = circles.find(c => Math.sqrt((c.x - x) ** 2 + (c.y - y) ** 2) < 15);
+                if (prevHovered !== hoveredCircle) {
+                    renderCircles(); // Перерисовываем только если изменилось
+                }
             }
         });
 
@@ -318,4 +346,3 @@
     </script>
 </body>
 </html>
-

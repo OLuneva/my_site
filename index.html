@@ -147,6 +147,7 @@
         let blinkState = false;  // Для переключения состояния мигания
         let blinkCount = 0;  // Счетчик миганий (добавлено для ограничения на 7 раз)
         let csvLoaded = false;
+        let hoveredCircle = null;  // НОВОЕ: Для отслеживания hovered круга (из кода разработчика)
 
         // Переменные для логических размеров Canvas (адаптивные), как в разработчике
         let logicalWidth = 800;
@@ -238,13 +239,26 @@
                 const y = circle.y * logicalHeight;
                 ctx.beginPath();
                 ctx.arc(x, y, 6, 0, 2 * Math.PI);  // Радиус 15px, как в разработчике
-                if (blinkingCircleIds.includes(circle.id) && isBlinking && blinkState) {
-                    ctx.fillStyle = 'red';  // Мигающие круги красные, как в разработчике для новых
+                // НОВОЕ: Цвет с приоритетом на hover (синий), затем мигание (красный), иначе оранжевый
+                if (hoveredCircle && hoveredCircle.id === circle.id) {
+                    ctx.fillStyle = 'blue';  // Подсветка при наведении
+                } else if (blinkingCircleIds.includes(circle.id) && isBlinking && blinkState) {
+                    ctx.fillStyle = 'red';  // Мигающие круги красные
                 } else {
-                    ctx.fillStyle = 'orange';  // Обычные круги оранжевые, как в разработчике для загруженных
+                    ctx.fillStyle = 'orange';  // Обычные круги оранжевые
                 }
                 ctx.fill();
                 ctx.stroke();  // Добавлен stroke для контура, как в разработчике
+                
+                // НОВОЕ: Отображение названия сорта при наведении (из кода разработчика)
+                if (hoveredCircle && hoveredCircle.id === circle.id) {
+                    const csvEntry = data.find(d => d['круг'] === circle.id);  // Ищем по ключу 'круг' (в нижнем регистре из парсинга)
+                    if (csvEntry && csvEntry['сорт']) {
+                        ctx.fillStyle = 'black';
+                        ctx.font = '12px Arial';
+                        ctx.fillText(csvEntry['сорт'], x + 20, y - 10);  // Текст рядом с кругом
+                    }
+                }
             });
             console.log('Круги нарисованы.');
         }
@@ -497,6 +511,18 @@
             initCanvas();  // Инициализируем размеры canvas
             await loadCircles();  // Загружаем круги и фон
             await loadCSV();  // Загружаем CSV
+            
+            // НОВОЕ: Обработчик mousemove для hover (из кода разработчика, адаптировано)
+            canvas.addEventListener('mousemove', (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const x = (e.clientX - rect.left) / logicalWidth;  // Нормализованные координаты
+                const y = (e.clientY - rect.top) / logicalHeight;
+                const prevHovered = hoveredCircle;
+                hoveredCircle = circlesData.find(c => Math.sqrt((c.x - x) ** 2 + (c.y - y) ** 2) < 15 / logicalWidth);  // Радиус 15px в процентах
+                if (prevHovered !== hoveredCircle) {
+                    drawCircles();  // Перерисовываем только если изменилось
+                }
+            });
         }
 
         window.onload = function() {

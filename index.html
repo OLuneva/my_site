@@ -126,8 +126,6 @@
                         <select id="subgroupSelect"><option>Не выбрано</option></select>
                     </div>
                 </div>
-                <button id="findPlantBtn">Найти растение</button>
-                <div id="status">Просмотр кругов с фильтрами по растениям.</div>
             </div>
         </div>
     </div>
@@ -304,38 +302,117 @@
             }).filter(row => row !== null);
         }
 
-        // Функция заполнения селекторов, без изменений
+        // Функция заполнения селекторов, изменена: теперь только listeners и начальный updateFilters()
         function populateFilters() {
             if (data.length === 0) return;
+
+            // Обработчики изменения - с проверкой на 'Не выбрано' и вызовом updateFilters() + filterData()
+            const classSelect = document.getElementById('classSelect');
+            classSelect.addEventListener('change', () => {
+                selectedFilters.class = classSelect.value === 'Не выбрано' ? '' : classSelect.value;
+                updateFilters();
+                filterData();
+            });
+
+            const subclassSelect = document.getElementById('subclassSelect');
+            subclassSelect.addEventListener('change', () => {
+                selectedFilters.subclass = subclassSelect.value === 'Не выбрано' ? '' : subclassSelect.value;
+                updateFilters();
+                filterData();
+            });
+
+            const typeSelect = document.getElementById('typeSelect');
+            typeSelect.addEventListener('change', () => {
+                selectedFilters.type = typeSelect.value === 'Не выбрано' ? '' : typeSelect.value;
+                updateFilters();
+                filterData();
+            });
+
+            const subtypeSelect = document.getElementById('subtypeSelect');
+            subtypeSelect.addEventListener('change', () => {
+                selectedFilters.subtype = subtypeSelect.value === 'Не выбрано' ? '' : subtypeSelect.value;
+                updateFilters();
+                filterData();
+            });
+
+            const groupSelect = document.getElementById('groupSelect');
+            groupSelect.addEventListener('change', () => {
+                selectedFilters.group = groupSelect.value === 'Не выбрано' ? '' : groupSelect.value;
+                updateFilters();
+                filterData();
+            });
+
+            // Начальное обновление всех селекторов (на основе пустых selectedFilters)
+            updateFilters();
+        }
+
+        // Новая функция для синхронизации selectedFilters с значениями селекторов (вызывается в конце updateFilters)
+        function syncSelectedFilters() {
             const classSelect = document.getElementById('classSelect');
             const subclassSelect = document.getElementById('subclassSelect');
             const typeSelect = document.getElementById('typeSelect');
             const subtypeSelect = document.getElementById('subtypeSelect');
             const groupSelect = document.getElementById('groupSelect');
-            // subgroupSelect скрыт
 
-            const classes = [...new Set(data.map(d => d['класс']).filter(Boolean))];
-            const subclasses = [...new Set(data.map(d => d['семейство']).filter(Boolean))];
-            const types = [...new Set(data.map(d => d['род']).filter(Boolean))];
-            const subtypes = [...new Set(data.map(d => d['вид']).filter(Boolean))];
-            const groups = [...new Set(data.map(d => d['сорт']).filter(Boolean))];
-
-            populateSelect(classSelect, classes);
-            populateSelect(subclassSelect, subclasses);
-            populateSelect(typeSelect, types);
-            populateSelect(subtypeSelect, subtypes);
-            populateSelect(groupSelect, groups);
-
-            // Обработчики изменения
-            classSelect.addEventListener('change', () => { selectedFilters.class = classSelect.value; filterData(); });
-            subclassSelect.addEventListener('change', () => { selectedFilters.subclass = subclassSelect.value; filterData(); });
-            typeSelect.addEventListener('change', () => { selectedFilters.type = typeSelect.value; filterData(); });
-            subtypeSelect.addEventListener('change', () => { selectedFilters.subtype = subtypeSelect.value; filterData(); });
-            groupSelect.addEventListener('change', () => { selectedFilters.group = groupSelect.value; filterData(); });
+            selectedFilters.class = classSelect.value === 'Не выбрано' ? '' : classSelect.value;
+            selectedFilters.subclass = subclassSelect.value === 'Не выбрано' ? '' : subclassSelect.value;
+            selectedFilters.type = typeSelect.value === 'Не выбрано' ? '' : typeSelect.value;
+            selectedFilters.subtype = subtypeSelect.value === 'Не выбрано' ? '' : subtypeSelect.value;
+            selectedFilters.group = groupSelect.value === 'Не выбрано' ? '' : groupSelect.value;
         }
 
-        // Функция заполнения одного селектора, без изменений
-        function populateSelect(select, options) {
+        // Обновленная функция для каскадного обновления селекторов (гибкая логика: все селекторы обновляются на основе ВСЕХ выбранных фильтров, кроме сорта - на основе верхних)
+        function updateFilters() {
+            if (data.length === 0) return;
+
+            // Шаг 1: Фильтруем данные по ВСЕМ текущим выбранным фильтрам (независимо от уровня) - для верхних селекторов
+            const filteredData = data.filter(d => {
+                return (!selectedFilters.class || d['класс'] === selectedFilters.class) &&
+                       (!selectedFilters.subclass || d['семейство'] === selectedFilters.subclass) &&
+                       (!selectedFilters.type || d['род'] === selectedFilters.type) &&
+                       (!selectedFilters.subtype || d['вид'] === selectedFilters.subtype) &&
+                       (!selectedFilters.group || d['сорт'] === selectedFilters.group);
+            });
+
+            // Шаг 2: Фильтруем данные только по верхним фильтрам (class, subclass, type, subtype) - для сорта
+            const upperFilteredData = data.filter(d => {
+                return (!selectedFilters.class || d['класс'] === selectedFilters.class) &&
+                       (!selectedFilters.subclass || d['семейство'] === selectedFilters.subclass) &&
+                       (!selectedFilters.type || d['род'] === selectedFilters.type) &&
+                       (!selectedFilters.subtype || d['вид'] === selectedFilters.subtype);
+            });
+
+            // Шаг 3: Обновляем верхние селекторы на основе filteredData
+            const classSelect = document.getElementById('classSelect');
+            const classes = [...new Set(filteredData.map(d => d['класс']).filter(Boolean))];
+            populateSelect(classSelect, classes, selectedFilters.class);
+
+            const subclassSelect = document.getElementById('subclassSelect');
+            const subclasses = [...new Set(filteredData.map(d => d['семейство']).filter(Boolean))];
+            populateSelect(subclassSelect, subclasses, selectedFilters.subclass);
+
+            const typeSelect = document.getElementById('typeSelect');
+            const types = [...new Set(filteredData.map(d => d['род']).filter(Boolean))];
+            populateSelect(typeSelect, types, selectedFilters.type);
+
+            const subtypeSelect = document.getElementById('subtypeSelect');
+            const subtypes = [...new Set(filteredData.map(d => d['вид']).filter(Boolean))];
+            populateSelect(subtypeSelect, subtypes, selectedFilters.subtype);
+
+            // Шаг 4: Обновляем селектор сорта на основе upperFilteredData (всегда показывает все сорта, совместимые с верхними фильтрами, независимо от выбранного сорта)
+            const groupSelect = document.getElementById('groupSelect');
+            const groups = [...new Set(upperFilteredData.map(d => d['сорт']).filter(Boolean))];
+            populateSelect(groupSelect, groups, selectedFilters.group);
+
+            // Шаг 5: Синхронизируем selectedFilters с актуальными значениями селекторов (сброс, если опция больше не доступна)
+            syncSelectedFilters();
+
+            console.log('Фильтры обновлены. Filtered data:', filteredData.length, 'Upper filtered data for group:', upperFilteredData.length);
+        }
+
+        // Функция заполнения одного селектора, без изменений (с сохранением выбора)
+        function populateSelect(select, options, selectedValue = '') {
+            const currentValue = select.value; // Сохраняем текущий выбор (хотя теперь используется selectedValue)
             select.innerHTML = '<option>Не выбрано</option>';
             options.sort().forEach(option => {
                 const opt = document.createElement('option');
@@ -343,9 +420,15 @@
                 opt.textContent = option;
                 select.appendChild(opt);
             });
+            // Восстанавливаем выбор, если он в опциях, иначе "Не выбрано"
+            if (selectedValue && options.includes(selectedValue)) {
+                select.value = selectedValue;
+            } else {
+                select.value = 'Не выбрано';
+            }
         }
 
-        // Функция фильтрации данных и поиска кругов, без изменений (логика сохранена)
+        // Функция фильтрации данных и поиска кругов, изменена: мигание только если выбран сорт
         function filterData() {
             if (!csvLoaded || data.length === 0) {
                 console.warn('Данные ещё не загружены');
@@ -361,7 +444,8 @@
             console.log('Отфильтрованные данные:', filtered.length);
             blinkingCircleIds = filtered.map(d => d['круг']).filter(id => id && circlesData.some(c => c.id == id));  // Исправлено на circlesData
             console.log('Мигающие круги:', blinkingCircleIds);
-            if (blinkingCircleIds.length > 0) {
+            // Мигание только если выбран сорт И есть круги
+            if (selectedFilters.group && blinkingCircleIds.length > 0) {
                 startBlinking();
             } else {
                 stopBlinking();
@@ -388,11 +472,6 @@
             }
             drawCircles(); // Перерисовываем без мигания
         }
-
-        // Кнопка "Найти растение" - фильтрует без subgroup, без изменений
-        document.getElementById('findPlantBtn').addEventListener('click', () => {
-            filterData();
-        });
 
         // Инициализация, адаптирована (initCanvas + load, как в разработчике)
         async function init() {
@@ -429,4 +508,3 @@
     </script>
 </body>
 </html>
-

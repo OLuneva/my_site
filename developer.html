@@ -321,6 +321,13 @@ canvas.addEventListener('mouseover', (e) => {
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+    console.log('Курсоры на canvas:', x, y);
+if (circle) {
+    console.log('Найден круг с ID:', circle.id);
+    console.log('Ищу в data:', data.find(d => d['Круг'] === circle.id));
+} else {
+    console.log('Круг не найден');
+}
     const circle = getCircleAt(x, y);
     const tooltip = document.getElementById('tooltip');
     if (circle) {
@@ -365,4 +372,5 @@ canvas.addEventListener('mouseover', (e) => {
     </script>
 </body>
 </html>
+
 
